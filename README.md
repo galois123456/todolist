@@ -1,5 +1,6 @@
 # 나만의 학교 업무 To Do List ver1.00
 
+
 기존 Google Apps Script / Google Sheets 버전을 Vite + Supabase 기반으로 다시 만든 프로젝트입니다. GitHub 저장소에 폴더 안의 파일들을 업로드하고 Vercel에 연결하면 휴대전화 브라우저에서 사용할 수 있습니다. **실제 Supabase 프로젝트와 계정이 없으면 앱의 로그인·저장은 작동하지 않습니다.**
 
 ## 기능
