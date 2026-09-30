@@ -1,0 +1,11 @@
+{
+  "name": "나만의 학교 업무 To Do List",
+  "short_name": "학교 업무",
+  "description": "업무 목록과 마감일 캘린더",
+  "lang": "ko",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f6f2",
+  "theme_color": "#237367",
+  "icons": [{"src":"/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
