@@ -10,7 +10,7 @@ const db = configured ? createClient(url, key, {
 
 const state = { user: null, tasks: [], categories: [], view: 'list', month: new Date(new Date().getFullYear(), new Date().getMonth(), 1), selected: localDate(new Date()), editId: null, authMode: 'login', loading: false };
 const priorityName = { high: '높음', medium: '보통', low: '낮음' };
-const $views = { list: $('listView'), calendar: $('calendarView'), settings: $('settingsView') };
+const $views = { list: $('listView'), calendar: $('calendarView'), input: $('inputView'), settings: $('settingsView') };
 
 function localDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -28,7 +28,7 @@ function applyTheme(value) {
   const dark = value === 'dark' || (value === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   $('themeSelect').value = value;
-  $('themeButton').textContent = dark ? '☀' : '☾';
+  $('themeButton').textContent = dark ? '☀ 라이트' : '☾ 다크';
   $('themeButton').title = dark ? '라이트 모드' : '다크 모드';
 }
 applyTheme(localStorage.getItem('school-todo-theme') || 'system');
@@ -117,10 +117,10 @@ if (!db) {
 }
 
 function switchView(view) {
+  if (view === 'input' && state.view !== 'input') prepareTask();
   state.view = view;
   Object.entries($views).forEach(([name, element]) => { element.hidden = name !== view; });
   document.querySelectorAll('[data-view]').forEach(button => button.classList.toggle('active', button.dataset.view === view));
-  $('pageTitle').textContent = { list: '업무 목록', calendar: '캘린더', settings: '설정·백업' }[view];
   if (view === 'calendar') renderCalendar();
   if (view === 'settings') renderCategories();
   window.scrollTo(0, 0);
@@ -132,6 +132,7 @@ function isOverdue(task) { return !task.completed && task.due_date && task.due_d
 function renderAll() {
   $('todayLabel').textContent = new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).format(new Date());
   const today = localDate(new Date());
+  $('statTotal').textContent = state.tasks.length;
   $('statActive').textContent = state.tasks.filter(t => !t.completed).length;
   $('statToday').textContent = state.tasks.filter(t => !t.completed && t.due_date === today).length;
   $('statOverdue').textContent = state.tasks.filter(isOverdue).length;
@@ -163,15 +164,18 @@ function renderTasks() {
     return (a.due_date || '9999').localeCompare(b.due_date || '9999') || rank[a.priority] - rank[b.priority];
   });
   $('shownCount').textContent = `${items.length}건`;
-  $('taskList').innerHTML = items.length ? items.map(t => `<article class="task-card ${t.completed ? 'done' : ''}"><input type="checkbox" class="check" data-toggle="${escapeHtml(t.id)}" aria-label="${escapeHtml(t.title)} 완료 여부" ${t.completed ? 'checked' : ''}><div class="task-body"><button type="button" class="task-name" data-edit="${escapeHtml(t.id)}">${escapeHtml(t.title)}</button><div class="task-meta"><span class="badge">${escapeHtml(categoryName(t.category_id))}</span><span class="badge ${t.priority}">${priorityName[t.priority]}</span><span class="badge date">${t.due_date ? `마감 ${escapeHtml(formatDay(t.due_date))}` : '마감일 없음'}</span>${isOverdue(t) ? '<span class="badge overdue">기한 초과</span>' : ''}</div>${t.note ? `<p class="task-note">${escapeHtml(t.note)}</p>` : ''}</div><button type="button" class="more" aria-label="${escapeHtml(t.title)} 수정" data-edit="${escapeHtml(t.id)}">⋯</button></article>`).join('') : '<div class="empty">해당하는 업무가 없습니다.<br>새 업무를 추가해 시작해 보세요.</div>';
+  const taskCard = t => `<article class="task-card ${t.completed ? 'done' : ''} ${isOverdue(t) ? 'overdue' : ''} priority-${t.priority}"><div class="task-body"><button type="button" class="task-name" data-edit="${escapeHtml(t.id)}">${escapeHtml(t.title)}</button><div class="task-meta"><span class="category-name">${escapeHtml(categoryName(t.category_id))}</span><span>중요도 ${priorityName[t.priority]}</span><span>시작 ${t.start_date ? escapeHtml(formatDay(t.start_date)) : '미정'}</span><span>마감 ${t.due_date ? escapeHtml(formatDay(t.due_date)) : '미정'}</span>${isOverdue(t) ? '<span>기한 초과</span>' : ''}</div></div><button type="button" class="complete-btn" data-toggle="${escapeHtml(t.id)}" aria-label="${escapeHtml(t.title)} ${t.completed ? '되돌리기' : '완료'}">${t.completed ? '되돌리기' : '완료'}</button></article>`;
+  const active = items.filter(t => !t.completed), done = items.filter(t => t.completed);
+  $('taskList').innerHTML = (active.length ? active.map(taskCard).join('') : '<div class="empty">진행 중인 업무가 없습니다.</div>') + (done.length ? `<div class="completed-section"><h3>완료한 업무</h3>${done.map(taskCard).join('')}</div>` : '');
 }
 ['search', 'statusFilter', 'categoryFilter', 'sort'].forEach(id => $(id).addEventListener('input', renderTasks));
 $('taskList').addEventListener('click', e => { const button = e.target.closest('[data-edit]'); if (button) openTask(button.dataset.edit); });
-$('taskList').addEventListener('change', async e => { const box = e.target.closest('[data-toggle]'); if (box) await toggleTask(box.dataset.toggle, box.checked, box); });
-async function toggleTask(id, completed, box) {
-  box.disabled = true;
-  try { checked(await db.from('todo_tasks').update({ completed, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', state.user.id).select().single()); state.tasks.find(t => t.id === id).completed = completed; renderAll(); }
-  catch (error) { box.checked = !completed; box.disabled = false; showNotice(errorText(error), true); }
+$('taskList').addEventListener('click', async e => { const button = e.target.closest('[data-toggle]'); if (button) await toggleTask(button.dataset.toggle, button); });
+async function toggleTask(id, button) {
+  const task = state.tasks.find(t => t.id === id); if (!task) return;
+  const completed = !task.completed; button.disabled = true;
+  try { checked(await db.from('todo_tasks').update({ completed, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', state.user.id).select().single()); task.completed = completed; renderAll(); }
+  catch (error) { button.disabled = false; showNotice(errorText(error), true); }
 }
 
 function renderCalendar() {
@@ -196,15 +200,14 @@ $('nextMonth').onclick = () => { state.month = new Date(state.month.getFullYear(
 $('currentMonth').onclick = () => { state.month = new Date(new Date().getFullYear(), new Date().getMonth(), 1); state.selected = localDate(new Date()); renderCalendar(); };
 $('addOnDate').onclick = () => openTask(null, state.selected);
 
-function openTask(id = null, dueDate = '') {
+function prepareTask(id = null, dueDate = '') {
   const t = state.tasks.find(item => item.id === id); state.editId = t?.id || null;
-  $('taskForm').reset(); $('dialogTitle').textContent = t ? '업무 수정' : '새 업무'; $('deleteTask').hidden = !t; $('taskError').textContent = '';
+  $('taskForm').reset(); $('dialogTitle').textContent = t ? '업무 수정' : '새 업무 입력'; $('deleteTask').hidden = !t; $('taskError').textContent = '';
   $('taskTitle').value = t?.title || ''; $('taskNote').value = t?.note || ''; $('taskCategory').value = t?.category_id || state.categories[0]?.id || '';
   $('taskPriority').value = t?.priority || 'medium'; $('taskStart').value = t?.start_date || ''; $('taskDue').value = t?.due_date || dueDate;
-  $('taskDialog').showModal(); $('taskTitle').focus();
 }
-[$('newTaskButton'), $('welcomeAdd')].forEach(button => button.onclick = () => openTask());
-$('closeDialog').onclick = $('cancelDialog').onclick = () => $('taskDialog').close();
+function openTask(id = null, dueDate = '') { switchView('input'); prepareTask(id, dueDate); $('taskTitle').focus(); }
+$('closeDialog').onclick = $('cancelDialog').onclick = () => switchView('list');
 $('taskForm').onsubmit = async event => {
   event.preventDefault(); if (state.loading) return;
   if ($('taskStart').value && $('taskDue').value && $('taskStart').value > $('taskDue').value) { $('taskError').textContent = '마감일은 시작일보다 빠를 수 없습니다.'; return; }
@@ -214,13 +217,13 @@ $('taskForm').onsubmit = async event => {
   try {
     if (state.editId) checked(await db.from('todo_tasks').update(values).eq('id', state.editId).eq('user_id', state.user.id).select().single());
     else checked(await db.from('todo_tasks').insert(values).select().single());
-    $('taskDialog').close(); await loadData(); showNotice('업무를 저장했습니다.');
+    await loadData(); switchView('list'); showNotice('업무를 저장했습니다.');
   } catch (error) { $('taskError').textContent = errorText(error); }
   finally { busy(false); }
 };
 $('deleteTask').onclick = async () => {
   const t = state.tasks.find(item => item.id === state.editId); if (!t || !confirm(`“${t.title}” 업무를 삭제할까요?`)) return;
-  busy(true); try { checked(await db.from('todo_tasks').delete().eq('id', t.id).eq('user_id', state.user.id).select().single()); $('taskDialog').close(); await loadData(); showNotice('업무를 삭제했습니다.'); }
+  busy(true); try { checked(await db.from('todo_tasks').delete().eq('id', t.id).eq('user_id', state.user.id).select().single()); await loadData(); switchView('list'); showNotice('업무를 삭제했습니다.'); }
   catch (error) { $('taskError').textContent = errorText(error); } finally { busy(false); }
 };
 
