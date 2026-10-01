@@ -5,6 +5,7 @@ create table if not exists public.todo_categories (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null check (char_length(btrim(name)) between 1 and 40),
+  color text,
   created_at timestamptz not null default now(),
   unique(user_id, name),
   unique(id, user_id)

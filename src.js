@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { categoryColors, categoryColor } from './category-colors.js';
 import { taskOnDay, taskDates, validateTaskDates, resolveDate } from './calendar-dates.js';
 
 const $ = id => document.getElementById(id);
@@ -131,6 +132,10 @@ function switchView(view) {
 document.querySelectorAll('[data-view]').forEach(button => button.onclick = () => switchView(button.dataset.view));
 
 function categoryName(id) { return state.categories.find(c => c.id === id)?.name || '미분류'; }
+function categoryStyle(id) {
+  const [, , light, dark] = categoryColor(state.categories.find(c => c.id === id), state.categories);
+  return `--category-light:${light};--category-dark:${dark}`;
+}
 function isOverdue(task) { return !task.yearly_repeat && !task.completed && task.due_date && task.due_date < localDate(new Date()); }
 function renderAll() {
   $('todayLabel').textContent = new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).format(new Date());
@@ -167,7 +172,7 @@ function renderTasks() {
     return (a.due_date || '9999').localeCompare(b.due_date || '9999') || rank[a.priority] - rank[b.priority];
   });
   $('shownCount').textContent = `${items.length}건`;
-  const taskCard = t => `<article class="task-card ${t.completed ? 'done' : ''} ${isOverdue(t) ? 'overdue' : ''} priority-${t.priority}"><div class="task-body"><button type="button" class="task-name" data-edit="${escapeHtml(t.id)}">${escapeHtml(t.title)}</button><div class="task-meta"><span class="category-name">${escapeHtml(categoryName(t.category_id))}</span><span>중요도 ${priorityName[t.priority]}</span><span>시작 ${escapeHtml(taskDateLabel(t, 'start'))}</span><span>마감 ${escapeHtml(taskDateLabel(t, 'due'))}</span>${t.yearly_repeat ? '<span>매년 반복</span>' : ''}${isOverdue(t) ? '<span>기한 초과</span>' : ''}</div></div><div class="task-actions"><button type="button" class="complete-btn" data-toggle="${escapeHtml(t.id)}" aria-label="${escapeHtml(t.title)} ${t.completed ? '되돌리기' : '완료'}">${t.completed ? '되돌리기' : '완료'}</button>${t.completed ? `<button type="button" class="delete-completed" data-delete="${escapeHtml(t.id)}">삭제</button>` : ''}</div></article>`;
+  const taskCard = t => `<article class="task-card ${t.completed ? 'done' : ''} ${isOverdue(t) ? 'overdue' : ''} priority-${t.priority}"><div class="task-body"><button type="button" class="task-name" data-edit="${escapeHtml(t.id)}">${escapeHtml(t.title)}</button><div class="task-meta"><span class="category-name" style="${categoryStyle(t.category_id)}">${escapeHtml(categoryName(t.category_id))}</span><span>중요도 ${priorityName[t.priority]}</span><span>시작 ${escapeHtml(taskDateLabel(t, 'start'))}</span><span>마감 ${escapeHtml(taskDateLabel(t, 'due'))}</span>${t.yearly_repeat ? '<span>매년 반복</span>' : ''}${isOverdue(t) ? '<span>기한 초과</span>' : ''}</div></div><div class="task-actions"><button type="button" class="complete-btn" data-toggle="${escapeHtml(t.id)}" aria-label="${escapeHtml(t.title)} ${t.completed ? '되돌리기' : '완료'}">${t.completed ? '되돌리기' : '완료'}</button>${t.completed ? `<button type="button" class="delete-completed" data-delete="${escapeHtml(t.id)}">삭제</button>` : ''}</div></article>`;
   const active = items.filter(t => !t.completed), done = items.filter(t => t.completed);
   $('taskList').innerHTML = (active.length ? active.map(taskCard).join('') : '<div class="empty">진행 중인 업무가 없습니다.</div>') + (done.length ? `<div class="completed-section"><h3>완료한 업무</h3>${done.map(taskCard).join('')}</div>` : '');
 }
@@ -241,8 +246,19 @@ $('deleteTask').onclick = async () => {
 };
 
 function renderCategories() {
-  $('categoryList').innerHTML = state.categories.map(c => `<div class="category-row"><strong>${escapeHtml(c.name)}</strong><div><button type="button" data-rename="${escapeHtml(c.id)}">이름 변경</button><button type="button" data-remove="${escapeHtml(c.id)}">삭제</button></div></div>`).join('');
+  $('categoryList').innerHTML = state.categories.map(c => `<div class="category-row"><strong class="category-name" style="${categoryStyle(c.id)}">${escapeHtml(c.name)}</strong><label class="category-color-label">색상<select data-color="${escapeHtml(c.id)}" aria-label="${escapeHtml(c.name)} 분야 색상">${categoryColors.map(([key, name]) => `<option value="${key}" ${categoryColor(c, state.categories)[0] === key ? 'selected' : ''}>${name}</option>`).join('')}</select></label><div><button type="button" data-rename="${escapeHtml(c.id)}">이름 변경</button><button type="button" data-remove="${escapeHtml(c.id)}">삭제</button></div></div>`).join('');
 }
+$('categoryList').onchange = async e => {
+  const select = e.target.closest('[data-color]');
+  if (!select || !categoryColors.some(([key]) => key === select.value)) return;
+  select.disabled = true;
+  try {
+    checked(await db.from('todo_categories').update({ color: select.value }).eq('id', select.dataset.color).eq('user_id', state.user.id).select().single());
+    await loadData();
+  } catch (error) {
+    renderCategories(); showNotice(`색상 저장 실패: ${errorText(error)} (ver1.06 SQL 실행 여부를 확인하세요.)`, true);
+  }
+};
 $('categoryForm').onsubmit = async e => {
   e.preventDefault(); const name = $('categoryName').value.trim(); if (!name) return;
   try { checked(await db.from('todo_categories').insert({ name, user_id: state.user.id })); $('categoryName').value = ''; await loadData(); }
@@ -296,7 +312,7 @@ function download(name, content, type) {
   const a = document.createElement('a'); const link = URL.createObjectURL(new Blob([content], { type })); a.href = link; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(link), 30000);
 }
 $('exportJson').onclick = () => {
-  const data = { format: 'school-todo-v1', exportedAt: new Date().toISOString(), categories: state.categories.map(c => c.name), tasks: state.tasks.map(t => ({ id: t.legacy_id || t.id, title: t.title, note: t.note, category: categoryName(t.category_id), priority: t.priority, startDate: t.start_date, dueDate: t.due_date, completed: t.completed, createdAt: t.created_at, updatedAt: t.updated_at, isLunar: t.is_lunar, yearlyRepeat: t.yearly_repeat, lunarLeap: t.lunar_leap, lunarStart: t.lunar_start, lunarDue: t.lunar_due })) };
+  const data = { format: 'school-todo-v1', exportedAt: new Date().toISOString(), categories: state.categories.map(c => c.name), categoryColors: state.categories.map(c => ({ name: c.name, color: categoryColor(c, state.categories)[0] })), tasks: state.tasks.map(t => ({ id: t.legacy_id || t.id, title: t.title, note: t.note, category: categoryName(t.category_id), priority: t.priority, startDate: t.start_date, dueDate: t.due_date, completed: t.completed, createdAt: t.created_at, updatedAt: t.updated_at, isLunar: t.is_lunar, yearlyRepeat: t.yearly_repeat, lunarLeap: t.lunar_leap, lunarStart: t.lunar_start, lunarDue: t.lunar_due })) };
   download(`학교업무_백업_${localDate(new Date())}.json`, JSON.stringify(data, null, 2), 'application/json;charset=utf-8');
 };
 async function ensureCategories(names) {
@@ -353,6 +369,13 @@ $('categoryCsvInput').onchange = e => handleFile(e.target, async text => {
 $('jsonInput').onchange = e => handleFile(e.target, async text => {
   const data = JSON.parse(text); if (data.format !== 'school-todo-v1' || !Array.isArray(data.tasks) || !Array.isArray(data.categories)) throw new Error('이 앱에서 내보낸 JSON 백업이 아닙니다.');
   await ensureCategories(data.categories); await importTasks(data.tasks);
+  if (Array.isArray(data.categoryColors)) {
+    for (const saved of data.categoryColors) {
+      const category = state.categories.find(c => c.name === saved.name);
+      if (category && categoryColors.some(([key]) => key === saved.color)) checked(await db.from('todo_categories').update({ color: saved.color }).eq('id', category.id).eq('user_id', state.user.id).select().single());
+    }
+    await loadData();
+  }
 });
 
 // 완료 업무 삭제
