@@ -44,10 +44,14 @@ body,#app{width:100%;max-width:100%}
 }
 .category-name{color:var(--category-light,#1d4ed8)}
 :root[data-theme=dark] .category-name{color:var(--category-dark,#93c5fd)}
-.category-row{flex-wrap:wrap}
-.category-row>strong{flex:1;min-width:70px;overflow-wrap:anywhere}
-.category-color-label{display:flex;align-items:center;gap:6px;font-size:.85rem}
-.category-color-label select{width:90px;min-height:40px;padding:6px;margin:0}
+.category-list{max-height:none;overflow:visible;gap:6px}
+.category-row{display:grid;grid-template-columns:minmax(0,1fr) 80px auto;align-items:center;gap:3px 8px;padding:5px 9px;line-height:1.25}
+.category-row>strong{min-width:0;overflow-wrap:anywhere}
+.category-row>div{justify-self:end;justify-content:flex-end;gap:2px}
+.category-row button{font-size:.82rem;white-space:nowrap;min-height:44px;padding:4px}
+.category-color-label{display:flex;align-items:center;margin:0;font-size:.85rem;min-width:0}
+.category-color-label select{width:80px;min-height:40px;padding:5px;margin:0}
+@media(max-width:360px){.category-row{grid-template-columns:minmax(0,1fr) 80px;row-gap:0}.category-row>div{grid-column:1/-1}.category-row button{min-height:36px}}
 /* ver1.05 캘린더 및 반복 날짜 옵션 */
 .week-labels .saturday,.day.saturday .day-number{color:#2563eb}.week-labels .sunday,.day.sunday .day-number{color:#dc2626}:root[data-theme=dark] .week-labels .saturday,:root[data-theme=dark] .day.saturday .day-number{color:#93c5fd}:root[data-theme=dark] .week-labels .sunday,:root[data-theme=dark] .day.sunday .day-number{color:#fca5a5}.day.today .day-number{background:var(--soft);color:var(--text);outline:2px solid var(--accent)}.holiday-name{font-size:.66rem;line-height:1.35;color:#dc2626;overflow-wrap:anywhere}.holiday-status{font-size:.78rem;color:var(--muted);margin:0 0 10px}.agenda-note{font-size:.82rem;line-height:1.6;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere;margin:7px 0 0}.repeat-options{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;margin-top:15px}.dialog-form .repeat-options label{display:inline-flex;align-items:center;gap:6px;margin:0;font-size:.95rem}.dialog-form .repeat-options input{width:18px!important;height:18px!important;min-height:0!important;margin:0!important;accent-color:#2563eb}.date-help{color:var(--muted);font-size:.76rem;line-height:1.5;margin:8px 0 0}.calendar-task{min-height:18px}.day{height:auto}.week-labels span{font-weight:800}
 @media(max-width:760px){.holiday-name{font-size:.58rem}.repeat-options{gap:12px}.dialog-form .repeat-options label{font-size:.9rem}}

@@ -246,7 +246,7 @@ $('deleteTask').onclick = async () => {
 };
 
 function renderCategories() {
-  $('categoryList').innerHTML = state.categories.map(c => `<div class="category-row"><strong class="category-name" style="${categoryStyle(c.id)}">${escapeHtml(c.name)}</strong><label class="category-color-label">색상<select data-color="${escapeHtml(c.id)}" aria-label="${escapeHtml(c.name)} 분야 색상">${categoryColors.map(([key, name]) => `<option value="${key}" ${categoryColor(c, state.categories)[0] === key ? 'selected' : ''}>${name}</option>`).join('')}</select></label><div><button type="button" data-rename="${escapeHtml(c.id)}">이름 변경</button><button type="button" data-remove="${escapeHtml(c.id)}">삭제</button></div></div>`).join('');
+  $('categoryList').innerHTML = state.categories.map(c => `<div class="category-row"><strong class="category-name" style="${categoryStyle(c.id)}">${escapeHtml(c.name)}</strong><label class="category-color-label"><select data-color="${escapeHtml(c.id)}" aria-label="${escapeHtml(c.name)} 분야 색상">${categoryColors.map(([key, name]) => `<option value="${key}" ${categoryColor(c, state.categories)[0] === key ? 'selected' : ''}>${name}</option>`).join('')}</select></label><div><button type="button" data-rename="${escapeHtml(c.id)}">이름 변경</button><button type="button" data-remove="${escapeHtml(c.id)}">삭제</button></div></div>`).join('');
 }
 $('categoryList').onchange = async e => {
   const select = e.target.closest('[data-color]');

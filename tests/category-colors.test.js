@@ -10,5 +10,7 @@ test('저장한 색상 우선, 잘못된 값은 안전하게 기본색 사용', 
   const c = { id:'1', color:'pink' };
   assert.equal(categoryColor(c, [c])[0], 'pink');
   assert.equal(categoryColor({...c, color:'";bad'}, [c])[0], 'blue');
-  assert.equal(categoryColors.length, 8);
+  assert.equal(categoryColors.length, 12);
+  assert.ok(categoryColors.some(([key]) => key === 'black'));
+  assert.ok(categoryColors.some(([key]) => key === 'yellow'));
 });
