@@ -42,6 +42,10 @@ body,#app{width:100%;max-width:100%}
   input,select,textarea,.auth-card input,.dialog-form input,.dialog-form select,.dialog-form textarea,.filters input,.filters select,.dialog-form input[type=date],.month-form input,.month-form select{font-size:16px}
   .file-actions>*{max-width:100%;white-space:normal;text-align:center}
 }
+.agenda-priority{font-weight:750}
+.agenda-priority.high{color:#d76c58}
+.agenda-priority.medium{color:#e1ac55}
+.agenda-priority.low{color:#6eb496}
 .category-name{color:var(--category-light,#1d4ed8)}
 :root[data-theme=dark] .category-name{color:var(--category-dark,#93c5fd)}
 .category-list{max-height:none;overflow:visible;gap:6px}
