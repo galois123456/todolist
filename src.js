@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { taskOnDay, taskDates, validateTaskDates, resolveDate } from './calendar-dates.js';
 
 const $ = id => document.getElementById(id);
 const url = import.meta.env.VITE_SUPABASE_URL;
@@ -8,6 +9,7 @@ const db = configured ? createClient(url, key, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
 }) : null;
 
+const holidayYears = new Map();
 const state = { user: null, tasks: [], categories: [], view: 'list', month: new Date(new Date().getFullYear(), new Date().getMonth(), 1), selected: localDate(new Date()), editId: null, authMode: 'login', loading: false };
 const priorityName = { high: '높음', medium: '보통', low: '낮음' };
 const $views = { list: $('listView'), calendar: $('calendarView'), input: $('inputView'), settings: $('settingsView') };
@@ -129,13 +131,13 @@ function switchView(view) {
 document.querySelectorAll('[data-view]').forEach(button => button.onclick = () => switchView(button.dataset.view));
 
 function categoryName(id) { return state.categories.find(c => c.id === id)?.name || '미분류'; }
-function isOverdue(task) { return !task.completed && task.due_date && task.due_date < localDate(new Date()); }
+function isOverdue(task) { return !task.yearly_repeat && !task.completed && task.due_date && task.due_date < localDate(new Date()); }
 function renderAll() {
   $('todayLabel').textContent = new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).format(new Date());
   const today = localDate(new Date());
   $('statTotal').textContent = state.tasks.length;
   $('statActive').textContent = state.tasks.filter(t => !t.completed).length;
-  $('statToday').textContent = state.tasks.filter(t => !t.completed && t.due_date === today).length;
+  $('statToday').textContent = state.tasks.filter(t => !t.completed && taskOnDay({ ...t, start_date: null, lunar_start: null }, today)).length;
   $('statOverdue').textContent = state.tasks.filter(isOverdue).length;
   $('statDone').textContent = state.tasks.filter(t => t.completed).length;
   $('focusText').textContent = `${$('statToday').textContent}건이 오늘 마감 · ${$('statOverdue').textContent}건이 기한 초과`;
@@ -155,7 +157,7 @@ function renderTasks() {
   const items = state.tasks.filter(t => {
     if (cat !== 'all' && t.category_id !== cat) return false;
     if (keyword && !`${t.title} ${t.note}`.toLocaleLowerCase().includes(keyword)) return false;
-    return status === 'all' || (status === 'active' && !t.completed) || (status === 'done' && t.completed) || (status === 'today' && !t.completed && t.due_date === today) || (status === 'overdue' && isOverdue(t));
+    return status === 'all' || (status === 'active' && !t.completed) || (status === 'done' && t.completed) || (status === 'today' && !t.completed && taskOnDay({ ...t, start_date: null, lunar_start: null }, today)) || (status === 'overdue' && isOverdue(t));
   }).sort((a, b) => {
     const sort = $('sort').value;
     if (sort === 'priority') return rank[a.priority] - rank[b.priority] || (a.due_date || '9999').localeCompare(b.due_date || '9999');
@@ -165,7 +167,7 @@ function renderTasks() {
     return (a.due_date || '9999').localeCompare(b.due_date || '9999') || rank[a.priority] - rank[b.priority];
   });
   $('shownCount').textContent = `${items.length}건`;
-  const taskCard = t => `<article class="task-card ${t.completed ? 'done' : ''} ${isOverdue(t) ? 'overdue' : ''} priority-${t.priority}"><div class="task-body"><button type="button" class="task-name" data-edit="${escapeHtml(t.id)}">${escapeHtml(t.title)}</button><div class="task-meta"><span class="category-name">${escapeHtml(categoryName(t.category_id))}</span><span>중요도 ${priorityName[t.priority]}</span><span>시작 ${t.start_date ? escapeHtml(formatDay(t.start_date)) : '미정'}</span><span>마감 ${t.due_date ? escapeHtml(formatDay(t.due_date)) : '미정'}</span>${isOverdue(t) ? '<span>기한 초과</span>' : ''}</div></div><div class="task-actions"><button type="button" class="complete-btn" data-toggle="${escapeHtml(t.id)}" aria-label="${escapeHtml(t.title)} ${t.completed ? '되돌리기' : '완료'}">${t.completed ? '되돌리기' : '완료'}</button>${t.completed ? `<button type="button" class="delete-completed" data-delete="${escapeHtml(t.id)}">삭제</button>` : ''}</div></article>`;
+  const taskCard = t => `<article class="task-card ${t.completed ? 'done' : ''} ${isOverdue(t) ? 'overdue' : ''} priority-${t.priority}"><div class="task-body"><button type="button" class="task-name" data-edit="${escapeHtml(t.id)}">${escapeHtml(t.title)}</button><div class="task-meta"><span class="category-name">${escapeHtml(categoryName(t.category_id))}</span><span>중요도 ${priorityName[t.priority]}</span><span>시작 ${escapeHtml(taskDateLabel(t, 'start'))}</span><span>마감 ${escapeHtml(taskDateLabel(t, 'due'))}</span>${t.yearly_repeat ? '<span>매년 반복</span>' : ''}${isOverdue(t) ? '<span>기한 초과</span>' : ''}</div></div><div class="task-actions"><button type="button" class="complete-btn" data-toggle="${escapeHtml(t.id)}" aria-label="${escapeHtml(t.title)} ${t.completed ? '되돌리기' : '완료'}">${t.completed ? '되돌리기' : '완료'}</button>${t.completed ? `<button type="button" class="delete-completed" data-delete="${escapeHtml(t.id)}">삭제</button>` : ''}</div></article>`;
   const active = items.filter(t => !t.completed), done = items.filter(t => t.completed);
   $('taskList').innerHTML = (active.length ? active.map(taskCard).join('') : '<div class="empty">진행 중인 업무가 없습니다.</div>') + (done.length ? `<div class="completed-section"><h3>완료한 업무</h3>${done.map(taskCard).join('')}</div>` : '');
 }
@@ -185,14 +187,22 @@ function renderCalendar() {
   const first = new Date(year, month, 1); const offset = (first.getDay() + 6) % 7;
   const days = Math.ceil((offset + new Date(year, month + 1, 0).getDate()) / 7) * 7;
   const today = localDate(new Date());
+  const visibleYears = new Set([new Date(year, month, 1-offset).getFullYear(),new Date(year,month,days-offset).getFullYear()]);
+  visibleYears.forEach(loadHolidays);
+  const holidayRecords = [...visibleYears].flatMap(y => holidayYears.get(y)?.rows || []);
+  const holidayNames = key => holidayRecords.filter(h => h.date === key).map(h => h.name).join(' · ');
+  const statuses = [...visibleYears].map(y => holidayYears.get(y));
+  $('holidayStatus').textContent = statuses.find(s => s?.error)?.error || (statuses.some(s => !s || s.loading) ? '공휴일을 불러오는 중입니다.' : '공휴일: 한국천문연구원 특일 정보');
+  $('retryHolidays').hidden = !statuses.some(s => s?.error);
   $('calendarGrid').innerHTML = Array.from({ length: days }, (_, i) => {
     const date = new Date(year, month, i + 1 - offset); const key = localDate(date);
-    const matches = state.tasks.filter(t => t.due_date === key).sort((a, b) => Number(a.completed) - Number(b.completed));
-    return `<button type="button" class="day ${date.getMonth() !== month ? 'other' : ''} ${key === today ? 'today' : ''} ${key === state.selected ? 'selected' : ''}" data-date="${key}" aria-label="${key}, 마감 ${matches.length}건"><span class="day-number">${date.getDate()}</span><span class="day-items">${matches.slice(0, 2).map(t => `<span class="calendar-task ${t.priority} ${t.completed ? 'done' : ''}" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>`).join('')}${matches.length > 2 ? `<span class="more-count">+${matches.length - 2}건</span>` : ''}</span></button>`;
+    const matches = state.tasks.filter(t => taskOnDay(t, key)).sort((a, b) => Number(a.completed) - Number(b.completed));
+    const holiday = holidayNames(key);
+    return `<button type="button" class="day ${holiday || date.getDay() === 0 ? 'sunday' : date.getDay() === 6 ? 'saturday' : ''} ${date.getMonth() !== month ? 'other' : ''} ${key === today ? 'today' : ''} ${key === state.selected ? 'selected' : ''}" data-date="${key}" aria-label="${key}${holiday ? ' ' + escapeHtml(holiday) : ''}, 업무 ${matches.length}건"><span class="day-number">${date.getDate()}</span><span class="day-items">${holiday ? `<span class="holiday-name">${escapeHtml(holiday)}</span>` : ''}${matches.slice(0, 2).map(t => `<span class="calendar-task ${t.priority} ${t.completed ? 'done' : ''}" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>`).join('')}${matches.length > 2 ? `<span class="more-count">+${matches.length - 2}건</span>` : ''}</span></button>`;
   }).join('');
-  const matches = state.tasks.filter(t => t.due_date === state.selected).sort((a, b) => Number(a.completed) - Number(b.completed));
+  const matches = state.tasks.filter(t => taskOnDay(t, state.selected)).sort((a, b) => Number(a.completed) - Number(b.completed));
   $('agendaDate').textContent = new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).format(parseLocal(state.selected));
-  $('agendaList').innerHTML = matches.length ? matches.map(t => `<div class="agenda-item"><button type="button" data-edit="${escapeHtml(t.id)}">${t.completed ? '✓ ' : ''}${escapeHtml(t.title)}</button><small>${escapeHtml(categoryName(t.category_id))} · 중요도 ${priorityName[t.priority]}${t.completed ? ' · 완료' : ''}</small></div>`).join('') : '<p class="muted">이 날짜에 마감되는 업무가 없습니다.</p>';
+  $('agendaList').innerHTML = matches.length ? matches.map(t => `<div class="agenda-item"><button type="button" data-edit="${escapeHtml(t.id)}">${t.completed ? '✓ ' : ''}${escapeHtml(t.title)}</button><small>${escapeHtml(categoryName(t.category_id))} · 중요도 ${priorityName[t.priority]}${t.completed ? ' · 완료' : ''}${t.yearly_repeat ? ' · 매년 반복' : ''}</small>${t.note ? `<p class="agenda-note">${escapeHtml(t.note)}</p>` : ''}</div>`).join('') : '<p class="muted">이 날짜의 업무가 없습니다.</p>';
 }
 $('calendarGrid').onclick = e => { const cell = e.target.closest('[data-date]'); if (!cell) return; state.selected = cell.dataset.date; state.month = new Date(parseLocal(state.selected).getFullYear(), parseLocal(state.selected).getMonth(), 1); renderCalendar(); };
 $('agendaList').onclick = e => { const target = e.target.closest('[data-edit]'); if (target) openTask(target.dataset.edit); };
@@ -205,14 +215,16 @@ function prepareTask(id = null, dueDate = '') {
   const t = state.tasks.find(item => item.id === id); state.editId = t?.id || null;
   $('taskForm').reset(); $('dialogTitle').textContent = t ? '업무 수정' : '새 업무 입력'; $('deleteTask').hidden = !t; $('taskError').textContent = '';
   $('taskTitle').value = t?.title || ''; $('taskNote').value = t?.note || ''; $('taskCategory').value = t?.category_id || state.categories[0]?.id || '';
-  $('taskPriority').value = t?.priority || 'medium'; $('taskStart').value = t?.start_date || ''; $('taskDue').value = t?.due_date || dueDate; syncDateLimits();
+  $('taskPriority').value = t?.priority || 'medium'; $('taskLunar').checked = !!t?.is_lunar; $('taskYearly').checked = !!t?.yearly_repeat; $('taskLeap').checked = !!t?.lunar_leap; syncDateLimits(); const dates = t ? taskDates(t) : {}; $('taskStart').value = dates.start || ''; $('taskDue').value = dates.due || dueDate; syncDateLimits();
 }
 function openTask(id = null, dueDate = '') { switchView('input'); prepareTask(id, dueDate); document.activeElement?.blur(); $('inputView').scrollIntoView({ block: 'start' }); }
 $('closeDialog').onclick = $('cancelDialog').onclick = () => switchView('list');
 $('taskForm').onsubmit = async event => {
   event.preventDefault(); if (state.loading) return;
-  if ($('taskStart').value && $('taskDue').value && $('taskStart').value > $('taskDue').value) { $('taskError').textContent = '마감일은 시작일보다 빠를 수 없습니다.'; return; }
-  const values = { user_id: state.user.id, title: $('taskTitle').value.trim(), note: $('taskNote').value.trim(), category_id: $('taskCategory').value, priority: $('taskPriority').value, start_date: $('taskStart').value || null, due_date: $('taskDue').value || null, updated_at: new Date().toISOString() };
+  let dates; const lunar = $('taskLunar').checked; const yearly = $('taskYearly').checked;
+  const options = { is_lunar: lunar, yearly_repeat: yearly, lunar_leap: lunar && $('taskLeap').checked, lunar_start: lunar ? $('taskStart').value || null : null, lunar_due: lunar ? $('taskDue').value || null : null, start_date: lunar ? null : $('taskStart').value || null, due_date: lunar ? null : $('taskDue').value || null };
+  try { dates = validateTaskDates(options); } catch(error) { $('taskError').textContent = error.message; return; }
+  const values = { user_id: state.user.id, title: $('taskTitle').value.trim(), note: $('taskNote').value.trim(), category_id: $('taskCategory').value, priority: $('taskPriority').value, ...options, start_date: dates.start, due_date: dates.due, updated_at: new Date().toISOString() };
   if (!values.title || !values.category_id) { $('taskError').textContent = '제목과 업무 분야를 확인하세요.'; return; }
   busy(true);
   try {
@@ -284,7 +296,7 @@ function download(name, content, type) {
   const a = document.createElement('a'); const link = URL.createObjectURL(new Blob([content], { type })); a.href = link; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(link), 30000);
 }
 $('exportJson').onclick = () => {
-  const data = { format: 'school-todo-v1', exportedAt: new Date().toISOString(), categories: state.categories.map(c => c.name), tasks: state.tasks.map(t => ({ id: t.legacy_id || t.id, title: t.title, note: t.note, category: categoryName(t.category_id), priority: t.priority, startDate: t.start_date, dueDate: t.due_date, completed: t.completed, createdAt: t.created_at, updatedAt: t.updated_at })) };
+  const data = { format: 'school-todo-v1', exportedAt: new Date().toISOString(), categories: state.categories.map(c => c.name), tasks: state.tasks.map(t => ({ id: t.legacy_id || t.id, title: t.title, note: t.note, category: categoryName(t.category_id), priority: t.priority, startDate: t.start_date, dueDate: t.due_date, completed: t.completed, createdAt: t.created_at, updatedAt: t.updated_at, isLunar: t.is_lunar, yearlyRepeat: t.yearly_repeat, lunarLeap: t.lunar_leap, lunarStart: t.lunar_start, lunarDue: t.lunar_due })) };
   download(`학교업무_백업_${localDate(new Date())}.json`, JSON.stringify(data, null, 2), 'application/json;charset=utf-8');
 };
 async function ensureCategories(names) {
@@ -297,12 +309,13 @@ function normalizeImported(raw, index) {
   const title = String(raw.title || '').trim(); if (!title || title.length > 200) throw new Error(`${index}행: 제목이 비었거나 너무 깁니다.`);
   const category = String(raw.category || '행정').trim() || '행정';
   const priority = ['high','medium','low'].includes(raw.priority) ? raw.priority : 'medium';
-  const start = csvDate(raw.startDate), due = csvDate(raw.dueDate);
+  const options = {is_lunar: raw.isLunar === true, yearly_repeat: raw.yearlyRepeat === true, lunar_leap: raw.lunarLeap === true, lunar_start: raw.lunarStart || null, lunar_due: raw.lunarDue || null, start_date: csvDate(raw.startDate), due_date: csvDate(raw.dueDate)};
+  const dates = validateTaskDates(options); const start = dates.start, due = dates.due;
   if (start && due && start > due) throw new Error(`${index}행: 마감일이 시작일보다 빠릅니다.`);
   const note = String(raw.note || ''); if (note.length > 10000) throw new Error(`${index}행: 메모가 너무 깁니다.`);
   const complete = raw.completed === true || ['true', 'TRUE', '1', '완료'].includes(String(raw.completed).trim());
   const legacy = String(raw.id || `row-${index}-${title}-${due || ''}`).trim();
-  return { title, note, category, priority, start, due, completed: complete, legacy_id: legacy, created_at: csvTime(raw.createdAt), updated_at: csvTime(raw.updatedAt) };
+  return { ...options, title, note, category, priority, start, due, completed: complete, legacy_id: legacy, created_at: csvTime(raw.createdAt), updated_at: csvTime(raw.updatedAt) };
 }
 async function importTasks(rows) {
   const normalized = rows.map((raw, i) => normalizeImported(raw, i + 2));
@@ -314,7 +327,7 @@ async function importTasks(rows) {
   });
   const catByName = new Map(state.categories.map(c => [c.name, c.id])); let saved = 0;
   for (let i = 0; i < incoming.length; i += 100) {
-    const batch = incoming.slice(i, i + 100).map(t => ({ user_id: state.user.id, category_id: catByName.get(t.category), title: t.title, note: t.note, priority: t.priority, start_date: t.start, due_date: t.due, completed: t.completed, legacy_id: t.legacy_id, ...(t.created_at ? { created_at: t.created_at } : {}), ...(t.updated_at ? { updated_at: t.updated_at } : {}) }));
+    const batch = incoming.slice(i, i + 100).map(t => ({ user_id: state.user.id, category_id: catByName.get(t.category), title: t.title, note: t.note, priority: t.priority, start_date: t.start, due_date: t.due, is_lunar: t.is_lunar, yearly_repeat: t.yearly_repeat, lunar_leap: t.lunar_leap, lunar_start: t.lunar_start, lunar_due: t.lunar_due, completed: t.completed, legacy_id: t.legacy_id, ...(t.created_at ? { created_at: t.created_at } : {}), ...(t.updated_at ? { updated_at: t.updated_at } : {}) }));
     checked(await db.from('todo_tasks').upsert(batch, { onConflict: 'user_id,legacy_id' })); saved += batch.length;
     $('importStatus').textContent = `${saved}건 가져옴…`;
   }
@@ -352,7 +365,14 @@ $('taskList').addEventListener('click', async e => {
   catch (error) { button.disabled = false; showNotice(errorText(error), true); }
 });
 // 날짜 입력 제한: 미정은 허용
-function syncDateLimits() { $('taskDue').min = $('taskStart').value || ''; $('taskStart').max = $('taskDue').value || ''; }
+function syncDateLimits() {
+ const lunar = $('taskLunar').checked;
+ for (const id of ['taskStart','taskDue']) { const input=$(id); input.type=lunar?'text':'date'; input.placeholder=lunar?'YYYY-MM-DD (음력)':''; input.inputMode=lunar?'numeric':'text'; input.pattern=lunar?'[0-9]{4}-[0-9]{2}-[0-9]{2}':''; }
+ $('leapWrap').hidden=!lunar;
+ $('taskDue').min=lunar?'':$('taskStart').value||''; $('taskStart').max=lunar?'':$('taskDue').value||'';
+ $('dateHelp').textContent=(lunar?'입력한 숫자를 음력 날짜로 해석합니다. 예: 2026-01-01. 양력으로 환산해 표시합니다(2050년까지 지원). ':'날짜 미정은 비워 두세요. ') + ($('taskYearly').checked?'매년 반복은 첫 입력 연도부터 표시하며, 없는 날짜(윤달·2월 29일)는 그해에 건너뜁니다.':'');
+}
+$('taskLunar').addEventListener('change',syncDateLimits); $('taskYearly').addEventListener('change',syncDateLimits);
 $('taskStart').addEventListener('input', syncDateLimits);
 $('taskDue').addEventListener('input', syncDateLimits);
 // 캘린더 직접 이동
@@ -365,3 +385,14 @@ swipeSurface.addEventListener('touchstart', e => { if (e.touches.length !== 1) {
 swipeSurface.addEventListener('touchend', e => { if (!calendarTouch || !e.changedTouches.length) return; const dx = e.changedTouches[0].clientX - calendarTouch.x, dy = e.changedTouches[0].clientY - calendarTouch.y; calendarTouch = null; if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.5) return; suppressCalendarClickUntil = Date.now() + 400; state.month = new Date(state.month.getFullYear(), state.month.getMonth() + (dx < 0 ? 1 : -1), 1); state.selected = localDate(state.month); renderCalendar(); }, { passive: true });
 swipeSurface.addEventListener('touchcancel', () => { calendarTouch = null; }, { passive: true });
 swipeSurface.addEventListener('click', e => { if (Date.now() < suppressCalendarClickUntil) { e.preventDefault(); e.stopPropagation(); } }, true);
+
+function taskDateLabel(t, which) { const d=taskDates(t)[which]; return d ? (t.is_lunar ? `음력 ${d}${t.lunar_leap ? ' (윤달)' : ''}` : formatDay(d)) : '미정'; }
+async function loadHolidays(year) {
+ if(holidayYears.has(year) || !state.user) return;
+ holidayYears.set(year,{loading:true,rows:[]});
+ try { const {data,error}=await db.auth.getSession(); if(error)throw error;
+  const response=await fetch(`/api/holidays?year=${year}`,{headers:{Authorization:`Bearer ${data.session?.access_token || ''}`}}); const result=await response.json(); if(!response.ok)throw new Error(result.error || '공휴일 조회에 실패했습니다.'); holidayYears.set(year,{rows:result.holidays||[]});
+ } catch(error){holidayYears.set(year,{rows:[],error:error.message || '공휴일을 불러오지 못했습니다.'});}
+ if(state.user) renderCalendar();
+}
+$('retryHolidays').onclick=()=>{ for(const [y,v] of holidayYears)if(v.error)holidayYears.delete(y); renderCalendar(); };

@@ -56,3 +56,11 @@ create policy "tasks_select_own" on public.todo_tasks for select to authenticate
 create policy "tasks_insert_own" on public.todo_tasks for insert to authenticated with check ((select auth.uid()) = user_id);
 create policy "tasks_update_own" on public.todo_tasks for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 create policy "tasks_delete_own" on public.todo_tasks for delete to authenticated using ((select auth.uid()) = user_id);
+
+-- 기존 공통 Supabase 프로젝트의 SQL Editor에서 한 번 실행하세요.
+-- todo_tasks에만 컬럼을 추가하며 습관 나침반 테이블과 기존 데이터는 보존합니다.
+alter table public.todo_tasks add column if not exists is_lunar boolean not null default false;
+alter table public.todo_tasks add column if not exists yearly_repeat boolean not null default false;
+alter table public.todo_tasks add column if not exists lunar_start text;
+alter table public.todo_tasks add column if not exists lunar_due text;
+alter table public.todo_tasks add column if not exists lunar_leap boolean not null default false;

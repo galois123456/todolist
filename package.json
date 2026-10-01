@@ -1,16 +1,19 @@
 {
   "name": "personal-school-todo",
   "private": true,
-  "version": "1.0.4",
+  "version": "1.0.5",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "check": "node --check src.js"
+    "check": "node --check src.js",
+    "test": "node --test tests/*.test.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.0.0"
+    "@supabase/supabase-js": "^2.0.0",
+    "fast-xml-parser": "^5.11.2",
+    "korean-lunar-calendar": "^0.3.6"
   },
   "devDependencies": {
     "vite": "^7.0.0"
