@@ -37,3 +37,6 @@
  .notes-title{font-size:1.15rem}.notes-view{padding:0 0 24px}
  .note-tools button,.paper-picker summary{min-height:40px}.sticky-note .note-body{font-size:16px}
 }
+
+.header-pill.tasks-link{background:#2563eb;color:#fff;border-color:#2563eb}
+.header-pill.tasks-link:hover{background:#1d4ed8;border-color:#1d4ed8}
