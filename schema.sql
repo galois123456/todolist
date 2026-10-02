@@ -5,6 +5,7 @@ create table if not exists public.todo_categories (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null check (char_length(btrim(name)) between 1 and 40),
+  color text,
   created_at timestamptz not null default now(),
   unique(user_id, name),
   unique(id, user_id)
@@ -56,3 +57,33 @@ create policy "tasks_select_own" on public.todo_tasks for select to authenticate
 create policy "tasks_insert_own" on public.todo_tasks for insert to authenticated with check ((select auth.uid()) = user_id);
 create policy "tasks_update_own" on public.todo_tasks for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 create policy "tasks_delete_own" on public.todo_tasks for delete to authenticated using ((select auth.uid()) = user_id);
+
+-- 기존 공통 Supabase 프로젝트의 SQL Editor에서 한 번 실행하세요.
+-- todo_tasks에만 컬럼을 추가하며 습관 나침반 테이블과 기존 데이터는 보존합니다.
+alter table public.todo_tasks add column if not exists is_lunar boolean not null default false;
+alter table public.todo_tasks add column if not exists yearly_repeat boolean not null default false;
+alter table public.todo_tasks add column if not exists lunar_start text;
+alter table public.todo_tasks add column if not exists lunar_due text;
+alter table public.todo_tasks add column if not exists lunar_leap boolean not null default false;
+
+-- 투두·습관 테이블을 변경하지 않는 독립 메모장입니다.
+create table if not exists public.todo_notes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  body text not null default '' check (char_length(body) <= 20000),
+  color text not null default 'yellow' check (color in ('yellow','orange','pink','blue','green','purple','cream','white')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists todo_notes_owner_created on public.todo_notes (user_id, created_at desc);
+alter table public.todo_notes enable row level security;
+revoke all on public.todo_notes from anon, authenticated;
+grant select, insert, update, delete on public.todo_notes to authenticated;
+drop policy if exists "notes_select_own" on public.todo_notes;
+drop policy if exists "notes_insert_own" on public.todo_notes;
+drop policy if exists "notes_update_own" on public.todo_notes;
+drop policy if exists "notes_delete_own" on public.todo_notes;
+create policy "notes_select_own" on public.todo_notes for select to authenticated using ((select auth.uid()) = user_id);
+create policy "notes_insert_own" on public.todo_notes for insert to authenticated with check ((select auth.uid()) = user_id);
+create policy "notes_update_own" on public.todo_notes for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+create policy "notes_delete_own" on public.todo_notes for delete to authenticated using ((select auth.uid()) = user_id);

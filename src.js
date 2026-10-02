@@ -1,3 +1,4 @@
+import { createNotes } from './notes.js';
 import { createClient } from '@supabase/supabase-js';
 import { categoryColors, categoryColor } from './category-colors.js';
 import { taskOnDay, taskDates, validateTaskDates, resolveDate } from './calendar-dates.js';
@@ -13,7 +14,8 @@ const db = configured ? createClient(url, key, {
 const holidayYears = new Map();
 const state = { user: null, tasks: [], categories: [], view: 'list', month: new Date(new Date().getFullYear(), new Date().getMonth(), 1), selected: localDate(new Date()), editId: null, authMode: 'login', loading: false };
 const priorityName = { high: '높음', medium: '보통', low: '낮음' };
-const $views = { list: $('listView'), calendar: $('calendarView'), input: $('inputView'), settings: $('settingsView') };
+const $views = { list: $('listView'), calendar: $('calendarView'), input: $('inputView'), settings: $('settingsView'), notes: $('notesView') };
+const notes = createNotes({ db, getUser: () => state.user });
 
 function localDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -39,7 +41,7 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => appl
 $('themeButton').onclick = () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
 $('themeSelect').onchange = event => applyTheme(event.target.value);
 
-function showAuth() { $('auth').hidden = false; $('app').hidden = true; $('authMessage').textContent = ''; }
+function showAuth() { notes.reset(); $('auth').hidden = false; $('app').hidden = true; $('authMessage').textContent = ''; }
 function showApp() { $('auth').hidden = true; $('app').hidden = false; $('accountEmail').textContent = state.user?.email || ''; }
 function setAuthMode(mode) {
   state.authMode = mode;
@@ -75,7 +77,7 @@ $('resetPassword').onclick = async () => {
   catch (error) { $('authMessage').textContent = errorText(error); }
 };
 $('signOut').onclick = async () => {
-  try { checked(await db.auth.signOut()); state.user = null; state.tasks = []; state.categories = []; showAuth(); setAuthMode('login'); }
+  try { await notes.flush(); checked(await db.auth.signOut()); state.user = null; state.tasks = []; state.categories = []; showAuth(); setAuthMode('login'); }
   catch (error) { showNotice(errorText(error), true); }
 };
 
@@ -122,19 +124,22 @@ if (!db) {
 
 const desktopLayout = matchMedia('(min-width: 1280px)');
 function syncViews() {
-  const split = desktopLayout.matches && state.view !== 'settings';
+  document.querySelector('.main-wrap').classList.toggle('notes-page-active', state.view === 'notes');
+  const split = desktopLayout.matches && !['settings', 'notes'].includes(state.view);
   document.querySelector('.content').classList.toggle('desktop-workspace', split);
-  Object.entries($views).forEach(([name, element]) => { element.hidden = split ? name === 'settings' : name !== state.view; });
+  Object.entries($views).forEach(([name, element]) => { element.hidden = split ? !['list', 'calendar', 'input'].includes(name) : name !== state.view; });
 }
-desktopLayout.addEventListener('change', () => { syncViews(); renderCalendar(); });
+desktopLayout.addEventListener('change', () => { syncViews(); if (!['notes','settings'].includes(state.view)) renderCalendar(); });
 syncViews();
 function switchView(view) {
   if (view === 'input' && state.view !== 'input') prepareTask();
+  if (state.view === 'notes' && view !== 'notes') notes.flush();
   state.view = view;
   syncViews();
   document.querySelectorAll('[data-view]').forEach(button => button.classList.toggle('active', button.dataset.view === view));
-  if (view === 'calendar' || desktopLayout.matches) renderCalendar();
+  if (view === 'calendar' || (desktopLayout.matches && !['settings','notes'].includes(view))) renderCalendar();
   if (view === 'settings') renderCategories();
+  if (view === 'notes') notes.open();
   window.scrollTo(0, 0);
 }
 document.querySelectorAll('[data-view]').forEach(button => button.onclick = () => switchView(button.dataset.view));
