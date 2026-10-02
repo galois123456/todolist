@@ -91,3 +91,6 @@ body,#app{width:100%;max-width:100%}
 }
 .category-row .color-palette .color-choice{color:var(--category-light)}
 :root[data-theme=dark] .category-row .color-palette .color-choice{color:var(--category-dark)}
+
+/* 캘린더 제목을 두 줄로 배치 */
+.calendar-heading{display:flex;flex-direction:column;align-items:flex-start;gap:10px;min-width:0}.calendar-heading .month-jump{margin:0}.title-line{margin-bottom:18px}

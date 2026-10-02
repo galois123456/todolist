@@ -1,3 +1,4 @@
+import { calendarWeek } from './calendar-week.js';
 import { createNotes } from './notes.js';
 import { createClient } from '@supabase/supabase-js';
 import { categoryColors, categoryColor } from './category-colors.js';
@@ -12,6 +13,7 @@ const db = configured ? createClient(url, key, {
 }) : null;
 
 const holidayYears = new Map();
+let weekStart = localStorage.getItem('school-todo-week-start') === 'sunday' ? 'sunday' : 'monday';
 const state = { user: null, tasks: [], categories: [], view: 'list', month: new Date(new Date().getFullYear(), new Date().getMonth(), 1), selected: localDate(new Date()), editId: null, authMode: 'login', loading: false };
 const priorityName = { high: '높음', medium: '보통', low: '낮음' };
 const $views = { list: $('listView'), calendar: $('calendarView'), input: $('inputView'), settings: $('settingsView'), notes: $('notesView') };
@@ -40,6 +42,12 @@ applyTheme(localStorage.getItem('school-todo-theme') || 'system');
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => applyTheme(localStorage.getItem('school-todo-theme') || 'system'));
 $('themeButton').onclick = () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
 $('themeSelect').onchange = event => applyTheme(event.target.value);
+$('weekStartSelect').value = weekStart;
+$('weekStartSelect').onchange = event => {
+  weekStart = event.target.value === 'sunday' ? 'sunday' : 'monday';
+  localStorage.setItem('school-todo-week-start', weekStart);
+  renderCalendar();
+};
 
 function showAuth() { notes.reset(); $('auth').hidden = false; $('app').hidden = true; $('authMessage').textContent = ''; }
 function showApp() { $('auth').hidden = true; $('app').hidden = false; $('accountEmail').textContent = state.user?.email || ''; }
@@ -202,7 +210,8 @@ async function toggleTask(id, button) {
 function renderCalendar() {
   const year = state.month.getFullYear(), month = state.month.getMonth();
   $('monthTitle').textContent = `${year}년 ${month + 1}월`;
-  const first = new Date(year, month, 1); const offset = (first.getDay() + 6) % 7;
+  const { offset, weekdays } = calendarWeek(year, month, weekStart);
+  $('weekLabels').innerHTML = weekdays.map(day => `<span class="${day === 0 ? 'sunday' : day === 6 ? 'saturday' : ''}">${'일월화수목금토'[day]}</span>`).join('');
   const days = Math.ceil((offset + new Date(year, month + 1, 0).getDate()) / 7) * 7;
   const today = localDate(new Date());
   const visibleYears = new Set([new Date(year, month, 1-offset).getFullYear(),new Date(year,month,days-offset).getFullYear()]);
@@ -210,7 +219,8 @@ function renderCalendar() {
   const holidayRecords = [...visibleYears].flatMap(y => holidayYears.get(y)?.rows || []);
   const holidayNames = key => holidayRecords.filter(h => h.date === key).map(h => h.name).join(' · ');
   const statuses = [...visibleYears].map(y => holidayYears.get(y));
-  $('holidayStatus').textContent = statuses.find(s => s?.error)?.error || (statuses.some(s => !s || s.loading) ? '공휴일을 불러오는 중입니다.' : '공휴일: 한국천문연구원 특일 정보');
+  $('holidayStatus').textContent = statuses.find(s => s?.error)?.error || (statuses.some(s => !s || s.loading) ? '공휴일을 불러오는 중입니다.' : '');
+  $('holidayStatus').hidden = !$('holidayStatus').textContent;
   $('retryHolidays').hidden = !statuses.some(s => s?.error);
   $('calendarGrid').innerHTML = Array.from({ length: days }, (_, i) => {
     const date = new Date(year, month, i + 1 - offset); const key = localDate(date);
