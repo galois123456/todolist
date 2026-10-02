@@ -120,12 +120,20 @@ if (!db) {
   db.auth.getUser().then(({ data, error }) => { if (data?.user) enter(data.user); else if (error) showAuth(); });
 }
 
+const desktopLayout = matchMedia('(min-width: 1280px)');
+function syncViews() {
+  const split = desktopLayout.matches && state.view !== 'settings';
+  document.querySelector('.content').classList.toggle('desktop-workspace', split);
+  Object.entries($views).forEach(([name, element]) => { element.hidden = split ? name === 'settings' : name !== state.view; });
+}
+desktopLayout.addEventListener('change', () => { syncViews(); renderCalendar(); });
+syncViews();
 function switchView(view) {
   if (view === 'input' && state.view !== 'input') prepareTask();
   state.view = view;
-  Object.entries($views).forEach(([name, element]) => { element.hidden = name !== view; });
+  syncViews();
   document.querySelectorAll('[data-view]').forEach(button => button.classList.toggle('active', button.dataset.view === view));
-  if (view === 'calendar') renderCalendar();
+  if (view === 'calendar' || desktopLayout.matches) renderCalendar();
   if (view === 'settings') renderCategories();
   window.scrollTo(0, 0);
 }
@@ -223,7 +231,7 @@ function prepareTask(id = null, dueDate = '') {
   $('taskPriority').value = t?.priority || 'medium'; $('taskLunar').checked = !!t?.is_lunar; $('taskYearly').checked = !!t?.yearly_repeat; $('taskLeap').checked = !!t?.lunar_leap; syncDateLimits(); const dates = t ? taskDates(t) : {}; $('taskStart').value = dates.start || ''; $('taskDue').value = dates.due || dueDate; syncDateLimits();
 }
 function openTask(id = null, dueDate = '') { switchView('input'); prepareTask(id, dueDate); document.activeElement?.blur(); $('inputView').scrollIntoView({ block: 'start' }); }
-$('closeDialog').onclick = $('cancelDialog').onclick = () => switchView('list');
+$('closeDialog').onclick = $('cancelDialog').onclick = () => { prepareTask(); switchView('list'); };
 $('taskForm').onsubmit = async event => {
   event.preventDefault(); if (state.loading) return;
   let dates; const lunar = $('taskLunar').checked; const yearly = $('taskYearly').checked;
@@ -235,36 +243,35 @@ $('taskForm').onsubmit = async event => {
   try {
     if (state.editId) checked(await db.from('todo_tasks').update(values).eq('id', state.editId).eq('user_id', state.user.id).select().single());
     else checked(await db.from('todo_tasks').insert(values).select().single());
-    await loadData(); switchView('list'); showNotice('업무를 저장했습니다.');
+    await loadData(); prepareTask(); switchView('list'); showNotice('업무를 저장했습니다.');
   } catch (error) { $('taskError').textContent = errorText(error); }
   finally { busy(false); }
 };
 $('deleteTask').onclick = async () => {
   const t = state.tasks.find(item => item.id === state.editId); if (!t || !confirm(`“${t.title}” 업무를 삭제할까요?`)) return;
-  busy(true); try { checked(await db.from('todo_tasks').delete().eq('id', t.id).eq('user_id', state.user.id).select().single()); await loadData(); switchView('list'); showNotice('업무를 삭제했습니다.'); }
+  busy(true); try { checked(await db.from('todo_tasks').delete().eq('id', t.id).eq('user_id', state.user.id).select().single()); await loadData(); prepareTask(); switchView('list'); showNotice('업무를 삭제했습니다.'); }
   catch (error) { $('taskError').textContent = errorText(error); } finally { busy(false); }
 };
 
 function renderCategories() {
-  $('categoryList').innerHTML = state.categories.map(c => `<div class="category-row"><strong class="category-name" style="${categoryStyle(c.id)}">${escapeHtml(c.name)}</strong><label class="category-color-label"><select data-color="${escapeHtml(c.id)}" aria-label="${escapeHtml(c.name)} 분야 색상">${categoryColors.map(([key, name]) => `<option value="${key}" ${categoryColor(c, state.categories)[0] === key ? 'selected' : ''}>${name}</option>`).join('')}</select></label><div><button type="button" data-rename="${escapeHtml(c.id)}">이름 변경</button><button type="button" data-remove="${escapeHtml(c.id)}">삭제</button></div></div>`).join('');
+  $('categoryList').innerHTML = state.categories.map(c => `<div class="category-row"><strong class="category-name" style="${categoryStyle(c.id)}">${escapeHtml(c.name)}</strong><details class="color-picker"><summary class="category-name" style="${categoryStyle(c.id)}" aria-label="${escapeHtml(c.name)} 분야 색상 선택">${categoryColor(c, state.categories)[1]} ▾</summary><div class="color-palette">${categoryColors.map(([key, name, light, dark]) => `<button type="button" class="color-choice category-name" style="--category-light:${light};--category-dark:${dark}" data-color-choice="${key}" data-category="${escapeHtml(c.id)}" aria-pressed="${categoryColor(c, state.categories)[0] === key}">${name}</button>`).join('')}</div></details><div><button type="button" data-rename="${escapeHtml(c.id)}">이름 변경</button><button type="button" data-remove="${escapeHtml(c.id)}">삭제</button></div></div>`).join('');
 }
-$('categoryList').onchange = async e => {
-  const select = e.target.closest('[data-color]');
-  if (!select || !categoryColors.some(([key]) => key === select.value)) return;
-  select.disabled = true;
-  try {
-    checked(await db.from('todo_categories').update({ color: select.value }).eq('id', select.dataset.color).eq('user_id', state.user.id).select().single());
-    await loadData();
-  } catch (error) {
-    renderCategories(); showNotice(`색상 저장 실패: ${errorText(error)} (ver1.06 SQL 실행 여부를 확인하세요.)`, true);
-  }
-};
 $('categoryForm').onsubmit = async e => {
   e.preventDefault(); const name = $('categoryName').value.trim(); if (!name) return;
   try { checked(await db.from('todo_categories').insert({ name, user_id: state.user.id })); $('categoryName').value = ''; await loadData(); }
   catch (error) { showNotice(errorText(error), true); }
 };
 $('categoryList').onclick = async e => {
+  const choice = e.target.closest('[data-color-choice]');
+  if (choice) {
+    if (!categoryColors.some(([key]) => key === choice.dataset.colorChoice)) return;
+    choice.closest('details').open = false;
+    try {
+      checked(await db.from('todo_categories').update({ color: choice.dataset.colorChoice }).eq('id', choice.dataset.category).eq('user_id', state.user.id).select().single());
+      await loadData();
+    } catch (error) { showNotice(`색상 저장 실패: ${errorText(error)} (ver1.06 SQL 실행 여부를 확인하세요.)`, true); }
+    return;
+  }
   const rename = e.target.closest('[data-rename]'); const remove = e.target.closest('[data-remove]');
   if (rename) {
     const category = state.categories.find(c => c.id === rename.dataset.rename); const name = prompt('새 업무 분야 이름', category.name)?.trim(); if (!name || name === category.name) return;

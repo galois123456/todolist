@@ -60,3 +60,34 @@ body,#app{width:100%;max-width:100%}
 .week-labels .saturday,.day.saturday .day-number{color:#2563eb}.week-labels .sunday,.day.sunday .day-number{color:#dc2626}:root[data-theme=dark] .week-labels .saturday,:root[data-theme=dark] .day.saturday .day-number{color:#93c5fd}:root[data-theme=dark] .week-labels .sunday,:root[data-theme=dark] .day.sunday .day-number{color:#fca5a5}.day.today .day-number{background:var(--soft);color:var(--text);outline:2px solid var(--accent)}.holiday-name{font-size:.66rem;line-height:1.35;color:#dc2626;overflow-wrap:anywhere}.holiday-status{font-size:.78rem;color:var(--muted);margin:0 0 10px}.agenda-note{font-size:.82rem;line-height:1.6;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere;margin:7px 0 0}.repeat-options{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;margin-top:15px}.dialog-form .repeat-options label{display:inline-flex;align-items:center;gap:6px;margin:0;font-size:.95rem}.dialog-form .repeat-options input{width:18px!important;height:18px!important;min-height:0!important;margin:0!important;accent-color:#2563eb}.date-help{color:var(--muted);font-size:.76rem;line-height:1.5;margin:8px 0 0}.calendar-task{min-height:18px}.day{height:auto}.week-labels span{font-weight:800}
 @media(max-width:760px){.holiday-name{font-size:.58rem}.repeat-options{gap:12px}.dialog-form .repeat-options label{font-size:.9rem}}
 .day.today.sunday .day-number{color:#dc2626}.day.today.saturday .day-number{color:#2563eb}:root[data-theme=dark] .day.today.sunday .day-number{color:#fca5a5}:root[data-theme=dark] .day.today.saturday .day-number{color:#93c5fd}
+.color-picker{position:relative;min-width:0}
+.color-picker summary{cursor:pointer;list-style:none;border:1px solid var(--line);border-radius:8px;padding:10px 6px;font-size:.85rem;white-space:nowrap;background:var(--surface)}
+.color-picker summary::-webkit-details-marker{display:none}
+.category-row .color-palette{position:absolute;z-index:10;right:0;top:100%;width:240px;padding:8px;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 25px #0003}
+.category-row .color-choice{color:var(--category-light);min-height:42px;border:1px solid var(--line);border-radius:6px;padding:6px}
+:root[data-theme=dark] .category-row .color-choice{color:var(--category-dark)}
+.category-row .color-choice[aria-pressed=true]{outline:2px solid var(--accent);outline-offset:-2px;background:var(--soft)}
+.color-picker summary:focus-visible{outline:3px solid var(--accent)}
+@media(min-width:1280px){
+ .main-wrap{width:calc(100% - 32px);max-width:2200px;margin-top:20px}
+ .topbar h1{font-size:30px}.date-box{padding:10px 14px;margin-bottom:14px}
+ .tabs{display:none}.subtitle{margin-bottom:12px}
+ .content.desktop-workspace{display:grid;grid-template-columns:minmax(300px,1fr) minmax(400px,1.35fr) minmax(300px,1fr);gap:14px;align-items:start}
+ .desktop-workspace #notice{grid-column:1/-1}
+ .desktop-workspace .view{padding:16px;min-width:0;border:1px solid var(--line)}
+ .desktop-workspace #listView{grid-column:1}.desktop-workspace #calendarView{grid-column:2}.desktop-workspace #inputView{grid-column:3}
+ .desktop-workspace .filters{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.desktop-workspace .filters input{grid-column:1/-1}
+ .desktop-workspace .filters select{font-size:.85rem;padding:8px;min-width:0}
+ .desktop-workspace .stats{grid-template-columns:repeat(2,1fr)}
+ .desktop-workspace .task-card{padding:12px;gap:8px}.desktop-workspace .complete-btn{padding:8px 10px;font-size:.85rem}
+ .desktop-workspace .calendar-layout{grid-template-columns:minmax(0,1fr);gap:12px}
+ .desktop-workspace .calendar-panel,.desktop-workspace .agenda-panel{padding:12px}
+ .desktop-workspace .calendar-head{flex-wrap:wrap;gap:8px}.desktop-workspace .day{min-height:85px;padding:5px}
+ .desktop-workspace .calendar-task{font-size:.65rem;padding:3px}.desktop-workspace .month-jump{font-size:1.3rem}
+ .desktop-workspace .input-grid{grid-template-columns:minmax(0,1fr)}.desktop-workspace .input-grid>.panel{padding:0;border:0;background:transparent}
+ .desktop-workspace .dialog-form label{font-size:.9rem}.desktop-workspace .dialog-form input,.desktop-workspace .dialog-form select{padding:9px;font-size:.9rem}
+ .desktop-workspace .dialog-heading h2{font-size:1.2rem}.desktop-workspace #closeDialog{display:none}
+ .desktop-workspace .form-grid{gap:9px}.desktop-workspace .dialog-actions{gap:7px}.desktop-workspace .dialog-actions .button{padding:10px 12px;font-size:.9rem}
+}
+.category-row .color-palette .color-choice{color:var(--category-light)}
+:root[data-theme=dark] .category-row .color-palette .color-choice{color:var(--category-dark)}

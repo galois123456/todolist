@@ -15,7 +15,7 @@
 <body>
   <div id="setupError" class="setup-error" hidden></div>
   <section id="auth" class="auth-screen" hidden>
-    <div class="auth-art"><span class="eyebrow">MY WORKSPACE · VER 1.08</span><h1>오늘의 일을<br>가볍게 정리하세요.</h1><p>업무를 적고, 날짜를 확인하고,<br>하나씩 완료하는 나만의 공간.</p><div class="art-check">✓ <span>오늘 할 일은 오늘의 속도로.</span></div></div>
+    <div class="auth-art"><span class="eyebrow">MY WORKSPACE · VER 1.09</span><h1>오늘의 일을<br>가볍게 정리하세요.</h1><p>업무를 적고, 날짜를 확인하고,<br>하나씩 완료하는 나만의 공간.</p><div class="art-check">✓ <span>오늘 할 일은 오늘의 속도로.</span></div></div>
     <div class="auth-panel"><form id="authForm" class="auth-card">
       <div class="brand-mark">✓</div><span class="eyebrow">SCHOOL PLANNER</span><h2 id="authTitle">다시 오셨군요</h2><p id="authIntro" class="muted">이메일과 비밀번호로 로그인하세요.</p>
       <label>이메일<input id="email" type="email" autocomplete="email" placeholder="name@example.com" required></label>
@@ -53,7 +53,7 @@
           <div class="panel"><span class="eyebrow">DATA</span><h2>데이터 가져오기·백업</h2><p class="muted">기존 Google 시트의 ‘업무’ 탭을 CSV로 다운로드해 가져오세요. ‘업무분야’ 탭도 CSV로 내보내면 분야 순서를 먼저 가져올 수 있습니다. 가져오기는 기존 업무를 삭제하지 않습니다.</p><div class="file-actions"><label class="button secondary file-label">업무 CSV 가져오기<input id="csvInput" type="file" accept=".csv,text/csv" hidden></label><label class="button secondary file-label">업무분야 CSV 가져오기<input id="categoryCsvInput" type="file" accept=".csv,text/csv" hidden></label><button id="exportJson" class="button secondary" type="button">JSON 백업</button><label class="button secondary file-label">JSON 복원<input id="jsonInput" type="file" accept=".json,application/json" hidden></label></div><p id="importStatus" class="muted" role="status"></p></div></div></section>
       </main>
     </div>
-    <footer>ver1.08 · made by yoonsungho</footer>
+    <footer>ver1.09 · made by yoonsungho</footer>
   </div>
   <dialog id="monthDialog"><form id="monthForm" class="month-form"><h2>연도·월 바로 이동</h2><label>연도<input id="jumpYear" type="number" min="1900" max="9999" required></label><label>월<select id="jumpMonth"><option value="1">1월</option><option value="2">2월</option><option value="3">3월</option><option value="4">4월</option><option value="5">5월</option><option value="6">6월</option><option value="7">7월</option><option value="8">8월</option><option value="9">9월</option><option value="10">10월</option><option value="11">11월</option><option value="12">12월</option></select></label><div class="dialog-actions"><button id="cancelMonth" class="button secondary" type="button">취소</button><button class="button primary" type="submit">이동</button></div></form></dialog>
   <script type="module" src="/src.js"></script>
