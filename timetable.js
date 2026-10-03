@@ -11,7 +11,7 @@ export function createTimetable({db,getUser,getWeekStart}) {
   function render() {
     if(!owner) return;
     const days=weekDays(anchor,getWeekStart()), rows=current().rows;
-    $('timetableWeekLabel').textContent=`${days[0].date} ~ ${days[6].date}`;
+    $('timetableWeekLabel').textContent=`${days[0].date} ~ ${days.at(-1).date}`;
     $('timetableSetup').hidden=!editing;
     $('timetableEdit').hidden=editing; $('timetableEdit').disabled=!loaded || saving;
     $('timetablePrev').disabled=saving; $('timetableNext').disabled=saving; $('timetableToday').disabled=saving;
@@ -63,9 +63,9 @@ export function createTimetable({db,getUser,getWeekStart}) {
   async function loadWeek() {
     if(!loaded) return;
     const userId=owner, token=generation, seq=++loadSequence, days=weekDays(anchor,getWeekStart());
-    weekLoading=true; render(); message('날짜별 세부사항을 불러오는 중…');
     try {
-      const records=checked(await db.from('todo_timetable_details').select('*').eq('user_id',userId).gte('entry_date',days[0].date).lte('entry_date',days[6].date));
+      weekLoading=true; render(); message('날짜별 세부사항을 불러오는 중…');
+      const records=checked(await db.from('todo_timetable_details').select('*').eq('user_id',userId).gte('entry_date',days[0].date).lte('entry_date',days.at(-1).date));
       if(token!==generation || seq!==loadSequence) return;
       weekLoading=false; details=new Map(records.map(r=>[detailKey(r.row_id,r.entry_date),r.body])); message(''); $('timetableRetry').hidden=true; render();
     } catch(error) { if(token===generation && seq===loadSequence){ message(`세부사항 조회 실패: ${error.message}`); $('timetableRetry').hidden=false; } }
@@ -75,8 +75,9 @@ export function createTimetable({db,getUser,getWeekStart}) {
     if(owner!==user.id){reset();owner=user.id;}
     if(loaded){render();await loadWeek();return;}
     if(loading)return;
-    loading=true; const token=generation; message('시간표를 불러오는 중…'); render();
+    loading=true; const token=generation;
     try {
+      message('시간표를 불러오는 중…'); render();
       const record=checked(await db.from('todo_timetables').select('*').eq('user_id',owner).maybeSingle());
       if(token!==generation)return;
       template=normalizeTemplate(record?.template); loaded=true; message(''); render(); await loadWeek();
