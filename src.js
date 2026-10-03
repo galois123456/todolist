@@ -1,3 +1,5 @@
+import { createTimetable } from './timetable.js';
+import { shareText, validateTimes, dateTimeLabel } from './schedule-share.js';
 import { calendarWeek } from './calendar-week.js';
 import { createNotes } from './notes.js';
 import { createClient } from '@supabase/supabase-js';
@@ -16,8 +18,9 @@ const holidayYears = new Map();
 let weekStart = localStorage.getItem('school-todo-week-start') === 'sunday' ? 'sunday' : 'monday';
 const state = { user: null, tasks: [], categories: [], view: 'list', month: new Date(new Date().getFullYear(), new Date().getMonth(), 1), selected: localDate(new Date()), editId: null, authMode: 'login', loading: false };
 const priorityName = { high: '높음', medium: '보통', low: '낮음' };
-const $views = { list: $('listView'), calendar: $('calendarView'), input: $('inputView'), settings: $('settingsView'), notes: $('notesView') };
+const $views = { list: $('listView'), calendar: $('calendarView'), input: $('inputView'), settings: $('settingsView'), notes: $('notesView'), timetable: $('timetableView') };
 const notes = createNotes({ db, getUser: () => state.user });
+const timetable = createTimetable({ db, getUser: () => state.user, getWeekStart: () => weekStart });
 
 function localDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -46,10 +49,10 @@ $('weekStartSelect').value = weekStart;
 $('weekStartSelect').onchange = event => {
   weekStart = event.target.value === 'sunday' ? 'sunday' : 'monday';
   localStorage.setItem('school-todo-week-start', weekStart);
-  renderCalendar();
+  renderCalendar(); timetable.render();
 };
 
-function showAuth() { notes.reset(); $('auth').hidden = false; $('app').hidden = true; $('authMessage').textContent = ''; }
+function showAuth() { notes.reset(); timetable.reset(); $('auth').hidden = false; $('app').hidden = true; $('authMessage').textContent = ''; }
 function showApp() { $('auth').hidden = true; $('app').hidden = false; $('accountEmail').textContent = state.user?.email || ''; }
 function setAuthMode(mode) {
   state.authMode = mode;
@@ -132,22 +135,24 @@ if (!db) {
 
 const desktopLayout = matchMedia('(min-width: 1280px)');
 function syncViews() {
-  document.querySelector('.main-wrap').classList.toggle('notes-page-active', state.view === 'notes');
-  const split = desktopLayout.matches && !['settings', 'notes'].includes(state.view);
+  document.querySelector('.main-wrap').classList.toggle('notes-page-active', ['notes','timetable'].includes(state.view));
+  const split = desktopLayout.matches && !['settings', 'notes', 'timetable'].includes(state.view);
   document.querySelector('.content').classList.toggle('desktop-workspace', split);
   Object.entries($views).forEach(([name, element]) => { element.hidden = split ? !['list', 'calendar', 'input'].includes(name) : name !== state.view; });
 }
-desktopLayout.addEventListener('change', () => { syncViews(); if (!['notes','settings'].includes(state.view)) renderCalendar(); });
+desktopLayout.addEventListener('change', () => { syncViews(); if (!['notes','settings','timetable'].includes(state.view)) renderCalendar(); });
 syncViews();
 function switchView(view) {
+  if (state.view === 'timetable' && view !== 'timetable' && !timetable.canLeave()) return;
   if (view === 'input' && state.view !== 'input') prepareTask();
   if (state.view === 'notes' && view !== 'notes') notes.flush();
   state.view = view;
   syncViews();
   document.querySelectorAll('[data-view]').forEach(button => button.classList.toggle('active', button.dataset.view === view));
-  if (view === 'calendar' || (desktopLayout.matches && !['settings','notes'].includes(view))) renderCalendar();
+  if (view === 'calendar' || (desktopLayout.matches && !['settings','notes','timetable'].includes(view))) renderCalendar();
   if (view === 'settings') renderCategories();
   if (view === 'notes') notes.open();
+  if (view === 'timetable') timetable.open();
   window.scrollTo(0, 0);
 }
 document.querySelectorAll('[data-view]').forEach(button => button.onclick = () => switchView(button.dataset.view));
@@ -195,7 +200,7 @@ function renderTasks() {
   $('shownCount').textContent = `${items.length}건`;
   const taskCard = t => `<article class="task-card ${t.completed ? 'done' : ''} ${isOverdue(t) ? 'overdue' : ''} priority-${t.priority}"><div class="task-body"><button type="button" class="task-name" data-edit="${escapeHtml(t.id)}">${escapeHtml(t.title)}</button><div class="task-meta"><span class="category-name" style="${categoryStyle(t.category_id)}">${escapeHtml(categoryName(t.category_id))}</span><span>중요도 ${priorityName[t.priority]}</span><span>시작 ${escapeHtml(taskDateLabel(t, 'start'))}</span><span>마감 ${escapeHtml(taskDateLabel(t, 'due'))}</span>${t.yearly_repeat ? '<span>매년 반복</span>' : ''}${isOverdue(t) ? '<span>기한 초과</span>' : ''}</div></div><div class="task-actions"><button type="button" class="complete-btn" data-toggle="${escapeHtml(t.id)}" aria-label="${escapeHtml(t.title)} ${t.completed ? '되돌리기' : '완료'}">${t.completed ? '되돌리기' : '완료'}</button>${t.completed ? `<button type="button" class="delete-completed" data-delete="${escapeHtml(t.id)}">삭제</button>` : ''}</div></article>`;
   const active = items.filter(t => !t.completed), done = items.filter(t => t.completed);
-  $('taskList').innerHTML = (active.length ? active.map(taskCard).join('') : '<div class="empty">진행 중인 업무가 없습니다.</div>') + (done.length ? `<div class="completed-section"><h3>완료한 업무</h3>${done.map(taskCard).join('')}</div>` : '');
+  $('taskList').innerHTML = (active.length ? active.map(taskCard).join('') : '<div class="empty">진행 중인 일정이 없습니다.</div>') + (done.length ? `<div class="completed-section"><h3>완료한 일정</h3>${done.map(taskCard).join('')}</div>` : '');
 }
 ['search', 'statusFilter', 'categoryFilter', 'sort'].forEach(id => $(id).addEventListener('input', renderTasks));
 $('taskList').addEventListener('click', e => { const button = e.target.closest('[data-edit]'); if (button) openTask(button.dataset.edit); });
@@ -226,14 +231,35 @@ function renderCalendar() {
     const date = new Date(year, month, i + 1 - offset); const key = localDate(date);
     const matches = state.tasks.filter(t => taskOnDay(t, key)).sort((a, b) => Number(a.completed) - Number(b.completed));
     const holiday = holidayNames(key);
-    return `<button type="button" class="day ${holiday || date.getDay() === 0 ? 'sunday' : date.getDay() === 6 ? 'saturday' : ''} ${date.getMonth() !== month ? 'other' : ''} ${key === today ? 'today' : ''} ${key === state.selected ? 'selected' : ''}" data-date="${key}" aria-label="${key}${holiday ? ' ' + escapeHtml(holiday) : ''}, 업무 ${matches.length}건"><span class="day-number">${date.getDate()}</span><span class="day-items">${holiday ? `<span class="holiday-name">${escapeHtml(holiday)}</span>` : ''}${matches.slice(0, 2).map(t => `<span class="calendar-task ${t.priority} ${t.completed ? 'done' : ''}" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>`).join('')}${matches.length > 2 ? `<span class="more-count">+${matches.length - 2}건</span>` : ''}</span></button>`;
+    return `<button type="button" class="day ${holiday || date.getDay() === 0 ? 'sunday' : date.getDay() === 6 ? 'saturday' : ''} ${date.getMonth() !== month ? 'other' : ''} ${key === today ? 'today' : ''} ${key === state.selected ? 'selected' : ''}" data-date="${key}" aria-label="${key}${holiday ? ' ' + escapeHtml(holiday) : ''}, 일정 ${matches.length}건"><span class="day-number">${date.getDate()}</span><span class="day-items">${holiday ? `<span class="holiday-name">${escapeHtml(holiday)}</span>` : ''}${matches.slice(0, 2).map(t => `<span class="calendar-task ${t.priority} ${t.completed ? 'done' : ''}" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>`).join('')}${matches.length > 2 ? `<span class="more-count">+${matches.length - 2}건</span>` : ''}</span></button>`;
   }).join('');
   const matches = state.tasks.filter(t => taskOnDay(t, state.selected)).sort((a, b) => Number(a.completed) - Number(b.completed));
   $('agendaDate').textContent = new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).format(parseLocal(state.selected));
-  $('agendaList').innerHTML = matches.length ? matches.map(t => `<div class="agenda-item"><button type="button" data-edit="${escapeHtml(t.id)}">${t.completed ? '✓ ' : ''}${escapeHtml(t.title)}</button><small><span class="category-name" style="${categoryStyle(t.category_id)}">${escapeHtml(categoryName(t.category_id))}</span> · <span class="agenda-priority ${['high', 'medium', 'low'].includes(t.priority) ? t.priority : 'medium'}">중요도 ${priorityName[t.priority] || '보통'}</span>${t.completed ? ' · 완료' : ''}${t.yearly_repeat ? ' · 매년 반복' : ''}</small>${t.note ? `<p class="agenda-note">${escapeHtml(t.note)}</p>` : ''}</div>`).join('') : '<p class="muted">이 날짜의 업무가 없습니다.</p>';
+  $('agendaList').innerHTML = matches.length ? matches.map(t => `<div class="agenda-item"><div class="agenda-item-heading"><button type="button" data-edit="${escapeHtml(t.id)}">${t.completed ? '✓ ' : ''}${escapeHtml(t.title)}</button><button class="agenda-share" type="button" data-share="${escapeHtml(t.id)}" aria-label="일정 공유 텍스트 복사">공유</button></div><small><span class="category-name" style="${categoryStyle(t.category_id)}">${escapeHtml(categoryName(t.category_id))}</span> · <span class="agenda-priority ${['high', 'medium', 'low'].includes(t.priority) ? t.priority : 'medium'}">중요도 ${priorityName[t.priority] || '보통'}</span>${t.completed ? ' · 완료' : ''}${t.yearly_repeat ? ' · 매년 반복' : ''}</small>${dateTimeLabel(t, state.selected) ? `<small>${escapeHtml(dateTimeLabel(t, state.selected))}</small>` : ''}${t.note ? `<p class="agenda-note">${escapeHtml(t.note)}</p>` : ''}</div>`).join('') : '<p class="muted">이 날짜의 일정이 없습니다.</p>';
 }
-$('calendarGrid').onclick = e => { const cell = e.target.closest('[data-date]'); if (!cell) return; state.selected = cell.dataset.date; state.month = new Date(parseLocal(state.selected).getFullYear(), parseLocal(state.selected).getMonth(), 1); renderCalendar(); };
-$('agendaList').onclick = e => { const target = e.target.closest('[data-edit]'); if (target) openTask(target.dataset.edit); };
+let lastCalendarTap = null;
+$('calendarGrid').onclick = e => {
+  const cell = e.target.closest('[data-date]'); if (!cell) return;
+  const repeat = lastCalendarTap === cell.dataset.date && state.selected === cell.dataset.date;
+  lastCalendarTap = cell.dataset.date; state.selected = cell.dataset.date;
+  state.month = new Date(parseLocal(state.selected).getFullYear(), parseLocal(state.selected).getMonth(), 1); renderCalendar();
+  if (repeat) $('agendaPanel').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+};
+$('agendaList').onclick = async e => {
+  const share = e.target.closest('[data-share]');
+  if (share) {
+    const task = state.tasks.find(t => t.id === share.dataset.share); if (!task) return;
+    const text = shareText(task, state.selected);
+    try { await navigator.clipboard.writeText(text); showNotice('일정 내용을 복사했습니다. 원하는 곳에 붙여넣으세요.'); }
+    catch {
+      const input = document.createElement('textarea'); input.value = text; document.body.append(input); input.select();
+      const copied = document.execCommand('copy'); input.remove();
+      if (copied) showNotice('일정 내용을 복사했습니다.'); else prompt('아래 일정 내용을 복사하세요.', text);
+    }
+    return;
+  }
+  const target = e.target.closest('[data-edit]'); if (target) openTask(target.dataset.edit);
+};
 $('prevMonth').onclick = () => { state.month = new Date(state.month.getFullYear(), state.month.getMonth() - 1, 1); renderCalendar(); };
 $('nextMonth').onclick = () => { state.month = new Date(state.month.getFullYear(), state.month.getMonth() + 1, 1); renderCalendar(); };
 $('currentMonth').onclick = () => { state.month = new Date(new Date().getFullYear(), new Date().getMonth(), 1); state.selected = localDate(new Date()); renderCalendar(); };
@@ -241,7 +267,8 @@ $('addOnDate').onclick = () => openTask(null, state.selected);
 
 function prepareTask(id = null, dueDate = '') {
   const t = state.tasks.find(item => item.id === id); state.editId = t?.id || null;
-  $('taskForm').reset(); $('dialogTitle').textContent = t ? '업무 수정' : '새 업무 입력'; $('deleteTask').hidden = !t; $('taskError').textContent = '';
+  $('taskForm').reset(); $('dialogTitle').textContent = t ? '일정 수정' : '새 일정 입력'; $('deleteTask').hidden = !t; $('taskError').textContent = '';
+  $('taskStartTime').value = t?.start_time?.slice(0,5) || ''; $('taskDueTime').value = t?.due_time?.slice(0,5) || '';
   $('taskTitle').value = t?.title || ''; $('taskNote').value = t?.note || ''; $('taskCategory').value = t?.category_id || state.categories[0]?.id || '';
   $('taskPriority').value = t?.priority || 'medium'; $('taskLunar').checked = !!t?.is_lunar; $('taskYearly').checked = !!t?.yearly_repeat; $('taskLeap').checked = !!t?.lunar_leap; syncDateLimits(); const dates = t ? taskDates(t) : {}; $('taskStart').value = dates.start || ''; $('taskDue').value = dates.due || dueDate; syncDateLimits();
 }
@@ -251,20 +278,21 @@ $('taskForm').onsubmit = async event => {
   event.preventDefault(); if (state.loading) return;
   let dates; const lunar = $('taskLunar').checked; const yearly = $('taskYearly').checked;
   const options = { is_lunar: lunar, yearly_repeat: yearly, lunar_leap: lunar && $('taskLeap').checked, lunar_start: lunar ? $('taskStart').value || null : null, lunar_due: lunar ? $('taskDue').value || null : null, start_date: lunar ? null : $('taskStart').value || null, due_date: lunar ? null : $('taskDue').value || null };
-  try { dates = validateTaskDates(options); } catch(error) { $('taskError').textContent = error.message; return; }
-  const values = { user_id: state.user.id, title: $('taskTitle').value.trim(), note: $('taskNote').value.trim(), category_id: $('taskCategory').value, priority: $('taskPriority').value, ...options, start_date: dates.start, due_date: dates.due, updated_at: new Date().toISOString() };
-  if (!values.title || !values.category_id) { $('taskError').textContent = '제목과 업무 분야를 확인하세요.'; return; }
+  const times = { start_time: $('taskStartTime').value || null, due_time: $('taskDueTime').value || null };
+  try { dates = validateTaskDates(options); validateTimes(options, times, dates); } catch(error) { $('taskError').textContent = error.message; return; }
+  const values = { user_id: state.user.id, title: $('taskTitle').value.trim(), note: $('taskNote').value.trim(), category_id: $('taskCategory').value, priority: $('taskPriority').value, ...options, ...times, start_date: dates.start, due_date: dates.due, updated_at: new Date().toISOString() };
+  if (!values.title || !values.category_id) { $('taskError').textContent = '제목과 일정 분야를 확인하세요.'; return; }
   busy(true);
   try {
     if (state.editId) checked(await db.from('todo_tasks').update(values).eq('id', state.editId).eq('user_id', state.user.id).select().single());
     else checked(await db.from('todo_tasks').insert(values).select().single());
-    await loadData(); prepareTask(); switchView('list'); showNotice('업무를 저장했습니다.');
+    await loadData(); prepareTask(); switchView('list'); showNotice('일정을 저장했습니다.');
   } catch (error) { $('taskError').textContent = errorText(error); }
   finally { busy(false); }
 };
 $('deleteTask').onclick = async () => {
-  const t = state.tasks.find(item => item.id === state.editId); if (!t || !confirm(`“${t.title}” 업무를 삭제할까요?`)) return;
-  busy(true); try { checked(await db.from('todo_tasks').delete().eq('id', t.id).eq('user_id', state.user.id).select().single()); await loadData(); prepareTask(); switchView('list'); showNotice('업무를 삭제했습니다.'); }
+  const t = state.tasks.find(item => item.id === state.editId); if (!t || !confirm(`“${t.title}” 일정을 삭제할까요?`)) return;
+  busy(true); try { checked(await db.from('todo_tasks').delete().eq('id', t.id).eq('user_id', state.user.id).select().single()); await loadData(); prepareTask(); switchView('list'); showNotice('일정을 삭제했습니다.'); }
   catch (error) { $('taskError').textContent = errorText(error); } finally { busy(false); }
 };
 
@@ -289,7 +317,7 @@ $('categoryList').onclick = async e => {
   }
   const rename = e.target.closest('[data-rename]'); const remove = e.target.closest('[data-remove]');
   if (rename) {
-    const category = state.categories.find(c => c.id === rename.dataset.rename); const name = prompt('새 업무 분야 이름', category.name)?.trim(); if (!name || name === category.name) return;
+    const category = state.categories.find(c => c.id === rename.dataset.rename); const name = prompt('새 일정 분야 이름', category.name)?.trim(); if (!name || name === category.name) return;
     try { checked(await db.from('todo_categories').update({ name }).eq('id', category.id).eq('user_id', state.user.id).select().single()); await loadData(); }
     catch (error) { showNotice(errorText(error), true); }
   } else if (remove) {
@@ -297,7 +325,7 @@ $('categoryList').onclick = async e => {
     
     const count = state.tasks.filter(t => t.category_id === category.id).length;
     localStorage.setItem(`school-todo-categories-initialized-${state.user.id}`, '1');
-    if (!confirm(`“${category.name}” 분야와 이 분야의 업무 ${count}건을 함께 삭제할까요? 삭제한 데이터는 되돌릴 수 없습니다.`)) return;
+    if (!confirm(`“${category.name}” 분야와 이 분야의 일정 ${count}건을 함께 삭제할까요? 삭제한 데이터는 되돌릴 수 없습니다.`)) return;
     try { checked(await db.from('todo_tasks').delete().eq('category_id', category.id).eq('user_id', state.user.id)); checked(await db.from('todo_categories').delete().eq('id', category.id).eq('user_id', state.user.id).select().single()); await loadData(); }
     catch (error) { showNotice(errorText(error), true); }
   }
@@ -334,12 +362,12 @@ function download(name, content, type) {
   const a = document.createElement('a'); const link = URL.createObjectURL(new Blob([content], { type })); a.href = link; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(link), 30000);
 }
 $('exportJson').onclick = () => {
-  const data = { format: 'school-todo-v1', exportedAt: new Date().toISOString(), categories: state.categories.map(c => c.name), categoryColors: state.categories.map(c => ({ name: c.name, color: categoryColor(c, state.categories)[0] })), tasks: state.tasks.map(t => ({ id: t.legacy_id || t.id, title: t.title, note: t.note, category: categoryName(t.category_id), priority: t.priority, startDate: t.start_date, dueDate: t.due_date, completed: t.completed, createdAt: t.created_at, updatedAt: t.updated_at, isLunar: t.is_lunar, yearlyRepeat: t.yearly_repeat, lunarLeap: t.lunar_leap, lunarStart: t.lunar_start, lunarDue: t.lunar_due })) };
-  download(`학교업무_백업_${localDate(new Date())}.json`, JSON.stringify(data, null, 2), 'application/json;charset=utf-8');
+  const data = { format: 'school-todo-v1', exportedAt: new Date().toISOString(), categories: state.categories.map(c => c.name), categoryColors: state.categories.map(c => ({ name: c.name, color: categoryColor(c, state.categories)[0] })), tasks: state.tasks.map(t => ({ id: t.legacy_id || t.id, title: t.title, note: t.note, category: categoryName(t.category_id), priority: t.priority, startDate: t.start_date, dueDate: t.due_date, startTime: t.start_time, dueTime: t.due_time, completed: t.completed, createdAt: t.created_at, updatedAt: t.updated_at, isLunar: t.is_lunar, yearlyRepeat: t.yearly_repeat, lunarLeap: t.lunar_leap, lunarStart: t.lunar_start, lunarDue: t.lunar_due })) };
+  download(`학교일정_백업_${localDate(new Date())}.json`, JSON.stringify(data, null, 2), 'application/json;charset=utf-8');
 };
 async function ensureCategories(names) {
   const unique = [...new Set(names.map(s => String(s || '').trim()).filter(Boolean))];
-  if (unique.some(s => s.length > 40)) throw new Error('업무 분야 이름은 40자 이하여야 합니다.');
+  if (unique.some(s => s.length > 40)) throw new Error('일정 분야 이름은 40자 이하여야 합니다.');
   const existing = new Set(state.categories.map(c => c.name)); const fresh = unique.filter(name => !existing.has(name));
   if (fresh.length) { checked(await db.from('todo_categories').upsert(fresh.map(name => ({ name, user_id: state.user.id })), { onConflict: 'user_id,name' })); await loadData(); }
 }
@@ -348,12 +376,13 @@ function normalizeImported(raw, index) {
   const category = String(raw.category || '행정').trim() || '행정';
   const priority = ['high','medium','low'].includes(raw.priority) ? raw.priority : 'medium';
   const options = {is_lunar: raw.isLunar === true, yearly_repeat: raw.yearlyRepeat === true, lunar_leap: raw.lunarLeap === true, lunar_start: raw.lunarStart || null, lunar_due: raw.lunarDue || null, start_date: csvDate(raw.startDate), due_date: csvDate(raw.dueDate)};
-  const dates = validateTaskDates(options); const start = dates.start, due = dates.due;
+  const times = { start_time: raw.startTime || null, due_time: raw.dueTime || null };
+  const dates = validateTaskDates(options); validateTimes(options, times, dates); const start = dates.start, due = dates.due;
   if (start && due && start > due) throw new Error(`${index}행: 마감일이 시작일보다 빠릅니다.`);
   const note = String(raw.note || ''); if (note.length > 10000) throw new Error(`${index}행: 메모가 너무 깁니다.`);
   const complete = raw.completed === true || ['true', 'TRUE', '1', '완료'].includes(String(raw.completed).trim());
   const legacy = String(raw.id || `row-${index}-${title}-${due || ''}`).trim();
-  return { ...options, title, note, category, priority, start, due, completed: complete, legacy_id: legacy, created_at: csvTime(raw.createdAt), updated_at: csvTime(raw.updatedAt) };
+  return { ...options, ...times, title, note, category, priority, start, due, completed: complete, legacy_id: legacy, created_at: csvTime(raw.createdAt), updated_at: csvTime(raw.updatedAt) };
 }
 async function importTasks(rows) {
   const normalized = rows.map((raw, i) => normalizeImported(raw, i + 2));
@@ -365,7 +394,7 @@ async function importTasks(rows) {
   });
   const catByName = new Map(state.categories.map(c => [c.name, c.id])); let saved = 0;
   for (let i = 0; i < incoming.length; i += 100) {
-    const batch = incoming.slice(i, i + 100).map(t => ({ user_id: state.user.id, category_id: catByName.get(t.category), title: t.title, note: t.note, priority: t.priority, start_date: t.start, due_date: t.due, is_lunar: t.is_lunar, yearly_repeat: t.yearly_repeat, lunar_leap: t.lunar_leap, lunar_start: t.lunar_start, lunar_due: t.lunar_due, completed: t.completed, legacy_id: t.legacy_id, ...(t.created_at ? { created_at: t.created_at } : {}), ...(t.updated_at ? { updated_at: t.updated_at } : {}) }));
+    const batch = incoming.slice(i, i + 100).map(t => ({ user_id: state.user.id, category_id: catByName.get(t.category), title: t.title, note: t.note, priority: t.priority, start_date: t.start, due_date: t.due, start_time: t.start_time, due_time: t.due_time, is_lunar: t.is_lunar, yearly_repeat: t.yearly_repeat, lunar_leap: t.lunar_leap, lunar_start: t.lunar_start, lunar_due: t.lunar_due, completed: t.completed, legacy_id: t.legacy_id, ...(t.created_at ? { created_at: t.created_at } : {}), ...(t.updated_at ? { updated_at: t.updated_at } : {}) }));
     checked(await db.from('todo_tasks').upsert(batch, { onConflict: 'user_id,legacy_id' })); saved += batch.length;
     $('importStatus').textContent = `${saved}건 가져옴…`;
   }
@@ -380,13 +409,13 @@ async function handleFile(input, handler) {
 }
 $('csvInput').onchange = e => handleFile(e.target, async text => {
   const [headers, ...rows] = parseCsv(text); if (!headers) throw new Error('CSV가 비어 있습니다.');
-  const required = ['ID', '업무 제목', '세부 내용', '업무 분야', '중요도', '업무 시작일', '완료 여부', '마감일', '등록 시각', '수정 시각'];
-  const order = required.map(h => headers.findIndex(v => v.trim() === h)); if (order.some(n => n < 0)) throw new Error('기존 ‘업무’ 시트의 CSV가 아닙니다. 첫 행의 열 이름을 확인하세요.');
+  const required = ['ID', '일정 제목', '세부 내용', '일정 분야', '중요도', '일정 시작일', '완료 여부', '마감일', '등록 시각', '수정 시각'];
+  const order = required.map(h => headers.findIndex(v => v.trim().replaceAll('업무', '일정') === h)); if (order.some(n => n < 0)) throw new Error('기존 ‘일정’ 시트의 CSV가 아닙니다. 첫 행의 열 이름을 확인하세요.');
   await importTasks(rows.map(row => { const values = order.map(i => row[i] || ''); return { id: values[0], title: values[1], note: values[2], category: values[3], priority: values[4], startDate: values[5], completed: values[6], dueDate: values[7], createdAt: values[8], updatedAt: values[9] }; }));
 });
 $('categoryCsvInput').onchange = e => handleFile(e.target, async text => {
-  const rows = parseCsv(text); const names = rows.flatMap((row, i) => i === 0 && ['업무 분야','업무분야','분야'].includes(row[0]?.trim()) ? [] : [row[0]]);
-  await ensureCategories(names); $('importStatus').textContent = `업무 분야 ${names.filter(Boolean).length}건 확인했습니다.`;
+  const rows = parseCsv(text); const names = rows.flatMap((row, i) => i === 0 && ['일정 분야','일정분야','업무 분야','업무분야','분야'].includes(row[0]?.trim()) ? [] : [row[0]]);
+  await ensureCategories(names); $('importStatus').textContent = `일정 분야 ${names.filter(Boolean).length}건 확인했습니다.`;
 });
 $('jsonInput').onchange = e => handleFile(e.target, async text => {
   const data = JSON.parse(text); if (data.format !== 'school-todo-v1' || !Array.isArray(data.tasks) || !Array.isArray(data.categories)) throw new Error('이 앱에서 내보낸 JSON 백업이 아닙니다.');
@@ -400,13 +429,13 @@ $('jsonInput').onchange = e => handleFile(e.target, async text => {
   }
 });
 
-// 완료 업무 삭제
+// 완료 일정 삭제
 $('taskList').addEventListener('click', async e => {
   const button = e.target.closest('[data-delete]'); if (!button) return;
   const task = state.tasks.find(t => t.id === button.dataset.delete);
-  if (!task || !confirm(`“${task.title}” 업무를 삭제할까요?`)) return;
+  if (!task || !confirm(`“${task.title}” 일정을 삭제할까요?`)) return;
   button.disabled = true;
-  try { checked(await db.from('todo_tasks').delete().eq('id', task.id).eq('user_id', state.user.id).select().single()); await loadData(); showNotice('업무를 삭제했습니다.'); }
+  try { checked(await db.from('todo_tasks').delete().eq('id', task.id).eq('user_id', state.user.id).select().single()); await loadData(); showNotice('일정을 삭제했습니다.'); }
   catch (error) { button.disabled = false; showNotice(errorText(error), true); }
 });
 // 날짜 입력 제한: 미정은 허용
@@ -431,7 +460,7 @@ swipeSurface.addEventListener('touchend', e => { if (!calendarTouch || !e.change
 swipeSurface.addEventListener('touchcancel', () => { calendarTouch = null; }, { passive: true });
 swipeSurface.addEventListener('click', e => { if (Date.now() < suppressCalendarClickUntil) { e.preventDefault(); e.stopPropagation(); } }, true);
 
-function taskDateLabel(t, which) { const d=taskDates(t)[which]; return d ? (t.is_lunar ? `음력 ${d}${t.lunar_leap ? ' (윤달)' : ''}` : formatDay(d)) : '미정'; }
+function taskDateLabel(t, which) { const d=taskDates(t)[which]; return d ? (t.is_lunar ? `음력 ${d}${t.lunar_leap ? ' (윤달)' : ''}` : formatDay(d)) + (t[which === 'start' ? 'start_time' : 'due_time'] ? ' ' + t[which === 'start' ? 'start_time' : 'due_time'].slice(0,5) : '') : '미정'; }
 async function loadHolidays(year) {
  if(holidayYears.has(year) || !state.user) return;
  holidayYears.set(year,{loading:true,rows:[]});
