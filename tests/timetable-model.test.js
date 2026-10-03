@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { weekDays, detailKey, normalizeTemplate } from '../timetable-model.js';
+import { weekDays, detailKey, normalizeTemplate, findRoomProfile, timetableColors } from '../timetable-model.js';
 test('주 시작 순서와 연말·윤년 주 날짜',()=>{
  const monday=weekDays(new Date(2027,0,1),'monday'), sunday=weekDays(new Date(2027,0,1),'sunday');
  assert.equal(monday[0].date,'2026-12-28');assert.equal(monday[6].date,'2027-01-03');assert.equal(sunday[0].date,'2026-12-27');
@@ -13,4 +13,11 @@ test('고정 시간표는 요일로 유지하고 세부사항은 날짜와 행�
  assert.notEqual(detailKey('row',first.date),detailKey('row',next.date));
  assert.notEqual(detailKey('row',first.date),detailKey('other',first.date));
  assert.equal(normalizeTemplate({rows:[{id:'x',cells:{0:{color:'url(bad)'}}}]}).rows[0].cells[0].color,'white');
+});
+
+test('반 이름이 정확히 일치할 때만 과목·색상을 자동 채움',()=>{
+ const rows=[{cells:{0:{room:'3-1',subject:'수학',color:'orange'},1:{room:'3-2',subject:'기하',color:'purple'}}}];
+ assert.deepEqual(findRoomProfile(rows,' 3-1 '),{subject:'수학',color:'orange'});
+ assert.equal(findRoomProfile(rows,'3'),null);assert.equal(findRoomProfile(rows,''),null);
+ assert.equal(timetableColors.length,16);assert.equal(new Set(timetableColors.map(c=>c[2])).size,16);
 });
