@@ -21,3 +21,12 @@ test('반 이름이 정확히 일치할 때만 과목·색상을 자동 채움',
  assert.equal(findRoomProfile(rows,'3'),null);assert.equal(findRoomProfile(rows,''),null);
  assert.equal(timetableColors.length,16);assert.equal(new Set(timetableColors.map(c=>c[2])).size,16);
 });
+
+test('평일 시간표는 월요일부터 금요일만 보여주며 주말 설정은 유지',()=>{
+ const days=weekDays(new Date(2026,9,3),'weekdays');
+ assert.deepEqual(days.map(d=>d.weekday),[1,2,3,4,5]);
+ assert.equal(days[0].date,'2026-09-28');assert.equal(days[4].date,'2026-10-02');
+ const saved=normalizeTemplate({rows:[{id:'row',cells:{0:{subject:'주말 일정',color:'yellow'},6:{subject:'토요일',color:'blue'}}}]});
+ assert.equal(saved.rows[0].cells[0].subject,'주말 일정');assert.equal(saved.rows[0].cells[6].subject,'토요일');
+ assert.equal(weekDays(new Date(2026,9,3),'sunday').length,7);
+});

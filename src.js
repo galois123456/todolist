@@ -1,3 +1,4 @@
+import { appColors } from './app-colors.js';
 import { createTimetable } from './timetable.js';
 import { shareText, validateTimes, dateTimeLabel } from './schedule-share.js';
 import { calendarWeek } from './calendar-week.js';
@@ -16,11 +17,13 @@ const db = configured ? createClient(url, key, {
 
 const holidayYears = new Map();
 let weekStart = localStorage.getItem('school-todo-week-start') === 'sunday' ? 'sunday' : 'monday';
+let timetableWeekStart = localStorage.getItem('school-todo-timetable-week-start') || weekStart;
+if (!['sunday','monday','weekdays'].includes(timetableWeekStart)) timetableWeekStart = weekStart;
 const state = { user: null, tasks: [], categories: [], view: 'list', month: new Date(new Date().getFullYear(), new Date().getMonth(), 1), selected: localDate(new Date()), editId: null, authMode: 'login', loading: false };
 const priorityName = { high: '높음', medium: '보통', low: '낮음' };
 const $views = { list: $('listView'), calendar: $('calendarView'), input: $('inputView'), settings: $('settingsView'), notes: $('notesView'), timetable: $('timetableView') };
 const notes = createNotes({ db, getUser: () => state.user });
-const timetable = createTimetable({ db, getUser: () => state.user, getWeekStart: () => weekStart });
+const timetable = createTimetable({ db, getUser: () => state.user, getWeekStart: () => timetableWeekStart });
 
 function localDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -49,7 +52,14 @@ $('weekStartSelect').value = weekStart;
 $('weekStartSelect').onchange = event => {
   weekStart = event.target.value === 'sunday' ? 'sunday' : 'monday';
   localStorage.setItem('school-todo-week-start', weekStart);
-  renderCalendar(); timetable.render();
+  renderCalendar();
+};
+
+$('timetableWeekSelect').value = timetableWeekStart;
+$('timetableWeekSelect').onchange = event => {
+  timetableWeekStart = ['sunday','monday','weekdays'].includes(event.target.value) ? event.target.value : 'monday';
+  localStorage.setItem('school-todo-timetable-week-start', timetableWeekStart);
+  timetable.render();
 };
 
 function showAuth() { notes.reset(); timetable.reset(); $('auth').hidden = false; $('app').hidden = true; $('authMessage').textContent = ''; }
@@ -297,7 +307,7 @@ $('deleteTask').onclick = async () => {
 };
 
 function renderCategories() {
-  $('categoryList').innerHTML = state.categories.map(c => `<div class="category-row"><strong class="category-name" style="${categoryStyle(c.id)}">${escapeHtml(c.name)}</strong><details class="color-picker"><summary class="category-name" style="${categoryStyle(c.id)}" aria-label="${escapeHtml(c.name)} 분야 색상 선택">${categoryColor(c, state.categories)[1]} ▾</summary><div class="color-palette">${categoryColors.map(([key, name, light, dark]) => `<button type="button" class="color-choice category-name" style="--category-light:${light};--category-dark:${dark}" data-color-choice="${key}" data-category="${escapeHtml(c.id)}" aria-pressed="${categoryColor(c, state.categories)[0] === key}">${name}</button>`).join('')}</div></details><div><button type="button" data-rename="${escapeHtml(c.id)}">이름 변경</button><button type="button" data-remove="${escapeHtml(c.id)}">삭제</button></div></div>`).join('');
+  $('categoryList').innerHTML = state.categories.map(c => `<div class="category-row"><strong class="category-name" style="${categoryStyle(c.id)}">${escapeHtml(c.name)}</strong><details class="color-picker paper-picker"><summary class="category-name" style="${categoryStyle(c.id)}" aria-label="${escapeHtml(c.name)} 분야 색상 선택">${categoryColor(c, state.categories)[1]} ▾</summary><div class="color-palette paper-palette">${categoryColors.map(([key, name, light, dark]) => `<button type="button" class="color-choice category-name paper-swatch" style="--paper:${appColors.find(([value])=>value===key)[2]};--category-light:${appColors.find(([value])=>value===key)[3]};--category-dark:${appColors.find(([value])=>value===key)[3]}" data-color-choice="${key}" data-category="${escapeHtml(c.id)}" aria-pressed="${categoryColor(c, state.categories)[0] === key}">${name}</button>`).join('')}</div></details><div><button type="button" data-rename="${escapeHtml(c.id)}">이름 변경</button><button type="button" data-remove="${escapeHtml(c.id)}">삭제</button></div></div>`).join('');
 }
 $('categoryForm').onsubmit = async e => {
   e.preventDefault(); const name = $('categoryName').value.trim(); if (!name) return;

@@ -1,4 +1,4 @@
-import { weekDays, detailKey, normalizeTemplate, timetableColors, findRoomProfile } from './timetable-model.js';
+import { weekDays, localDay, detailKey, normalizeTemplate, timetableColors, findRoomProfile } from './timetable-model.js';
 export function createTimetable({db,getUser,getWeekStart}) {
   const $ = id => document.getElementById(id);
   const escape = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -12,11 +12,11 @@ export function createTimetable({db,getUser,getWeekStart}) {
     if(!owner) return;
     const days=weekDays(anchor,getWeekStart()), rows=current().rows;
     $('timetableWeekLabel').textContent=`${days[0].date} ~ ${days[6].date}`;
-    $('timetableSetup').hidden=!editing; $('timetableHint').hidden=editing;
+    $('timetableSetup').hidden=!editing;
     $('timetableEdit').hidden=editing; $('timetableEdit').disabled=!loaded || saving;
     $('timetablePrev').disabled=saving; $('timetableNext').disabled=saving; $('timetableToday').disabled=saving;
     $('timetableAddRow').disabled=saving; $('timetableSave').disabled=saving; $('timetableCancel').disabled=saving;
-    $('timetableTable').innerHTML=`<thead><tr><th scope="col">교시 · 시간</th>${days.map(d=>`<th scope="col" class="${d.weekday===0?'sunday':d.weekday===6?'saturday':''}">${'일월화수목금토'[d.weekday]}<small>${d.label}</small></th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr><th scope="row">${editing?`<input data-row="${escape(row.id)}" ${saving?'disabled':''} data-field="label" aria-label="행 이름" maxlength="40" value="${escape(row.label)}"><input data-row="${escape(row.id)}" ${saving?'disabled':''} data-field="start" aria-label="시작 시간" type="time" value="${escape(row.start)}"><input data-row="${escape(row.id)}" ${saving?'disabled':''} data-field="end" aria-label="종료 시간" type="time" value="${escape(row.end)}"><button type="button" class="text-button" data-remove-row="${escape(row.id)}">행 삭제</button>`:`<strong>${escape(row.label || '이름 없음')}</strong><small>${escape([row.start,row.end].filter(Boolean).join(' ~ '))}</small>`}</th>${days.map(d=>{const cell=row.cells[d.weekday] || {}, note=details.get(detailKey(row.id,d.date)) || '', color=timetableColors.find(([key])=>key===cell.color)?.[2] || '#fff';return `<td><button type="button" class="timetable-cell" style="--cell-color:${color}" data-row-cell="${escape(row.id)}" data-date="${d.date}" data-weekday="${d.weekday}" ${saving || !loaded || (!editing && weekLoading)?'disabled':''}><strong>${escape(cell.subject)}</strong><span>${escape(cell.room)}</span>${!editing&&note?`<small class="timetable-detail-preview">${escape(note)}</small>`:''}<span class="cell-placeholder">${editing?'설정':!cell.subject&&!cell.room&&!note?'＋':''}</span></button></td>`;}).join('')}</tr>`).join('')}</tbody>`;
+    $('timetableTable').innerHTML=`<thead><tr><th scope="col">교시 · 시간</th>${days.map(d=>`<th scope="col" class="${d.weekday===0?'sunday':d.weekday===6?'saturday':''} ${d.date===localDay(new Date())?'timetable-today':''}">${'일월화수목금토'[d.weekday]}<small>${d.label}${d.date===localDay(new Date())?' · 오늘':''}</small></th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr><th scope="row">${editing?`<input data-row="${escape(row.id)}" ${saving?'disabled':''} data-field="label" aria-label="행 이름" maxlength="40" value="${escape(row.label)}"><input data-row="${escape(row.id)}" ${saving?'disabled':''} data-field="start" aria-label="시작 시간" type="time" value="${escape(row.start)}"><input data-row="${escape(row.id)}" ${saving?'disabled':''} data-field="end" aria-label="종료 시간" type="time" value="${escape(row.end)}"><button type="button" class="text-button" data-remove-row="${escape(row.id)}">행 삭제</button>`:`<strong>${escape(row.label || '이름 없음')}</strong><small>${escape([row.start,row.end].filter(Boolean).join(' ~ '))}</small>`}</th>${days.map(d=>{const cell=row.cells[d.weekday] || {}, note=details.get(detailKey(row.id,d.date)) || '', color=timetableColors.find(([key])=>key===cell.color)?.[2] || '#fff';return `<td><button type="button" class="timetable-cell" style="--cell-color:${color};--cell-ink:${cell.color==='black'?'#f8fafc':'#1f2937'}" data-row-cell="${escape(row.id)}" data-date="${d.date}" data-weekday="${d.weekday}" ${saving || !loaded || (!editing && weekLoading)?'disabled':''}><strong>${escape(cell.subject)}</strong><span>${escape(cell.room)}</span>${!editing&&note?`<small class="timetable-detail-preview">${escape(note)}</small>`:''}<span class="cell-placeholder">${editing?'설정':!cell.subject&&!cell.room&&!note?'＋':''}</span></button></td>`;}).join('')}</tr>`).join('')}</tbody>`;
     renderDetails(days);
     if(loaded && !rows.length) message('시간표 설정을 눌러 행을 추가하세요.');
   }
@@ -33,9 +33,10 @@ export function createTimetable({db,getUser,getWeekStart}) {
   }
   function selectColor(key) {
     $('timetableColor').value=key;
-    $('timetableColorPalette').innerHTML=timetableColors.map(([value,label,paper,ink])=>`<button type="button" data-timetable-color="${value}" style="--paper:${paper};--ink:${ink}" aria-pressed="${key===value}"><span aria-hidden="true"></span>${label}</button>`).join('');
+    const selected=timetableColors.find(([value])=>value===key); $('timetableColorLabel').textContent=(selected?.[1] || '색상')+' ▾';
+    $('timetableColorPalette').innerHTML=timetableColors.map(([value,label,paper,ink])=>`<button type="button" class="paper-swatch" data-timetable-color="${value}" style="--paper:${paper};--ink:${ink}" aria-pressed="${key===value}"><span aria-hidden="true"></span>${label}</button>`).join('');
   }
-  $('timetableColorPalette').onclick=e=>{const button=e.target.closest('[data-timetable-color]');if(button)selectColor(button.dataset.timetableColor);};
+  $('timetableColorPalette').onclick=e=>{const button=e.target.closest('[data-timetable-color]');if(button){selectColor(button.dataset.timetableColor);$('timetableColorPicker').open=false;}};
   $('timetableRoom').oninput=()=>{
     if(!editing)return;
     const room=$('timetableRoom').value.trim(), profile=roomProfiles.get(room) || findRoomProfile(draft.rows,room);

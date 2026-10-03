@@ -1,6 +1,7 @@
 import { createAutoSaver } from './note-autosave.js';
 
-const paperColors = [['yellow','노랑'],['orange','주황'],['pink','분홍'],['blue','하늘'],['green','민트'],['purple','보라'],['cream','크림'],['white','흰색']];
+import { appColors } from './app-colors.js';
+const paperColors = appColors;
 export function createNotes({ db, getUser }) {
   const grid = document.getElementById('notesGrid');
   const message = document.getElementById('notesMessage');
