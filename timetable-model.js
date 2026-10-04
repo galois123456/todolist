@@ -20,3 +20,12 @@ export function findRoomProfile(rows, room) {
   }
   return found;
 }
+
+// Keep the active rows at the root for compatibility with the existing database constraint.
+export function normalizeTimetables(value) {
+  const schedules = Array.isArray(value?.schedules) && value.schedules.length
+    ? value.schedules.map((item,index)=>({id:String(item.id || `schedule-${index}`),name:String(item.name || `시간표 ${index+1}`).slice(0,40),...normalizeTemplate(item)}))
+    : [{id:'default',name:'기본 시간표',...normalizeTemplate(value)}];
+  const activeId=schedules.some(item=>item.id===value?.activeId)?value.activeId:schedules[0].id;
+  return {schedules,activeId,rows:schedules.find(item=>item.id===activeId).rows};
+}

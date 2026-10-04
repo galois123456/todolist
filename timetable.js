@@ -1,18 +1,27 @@
-import { weekDays, localDay, detailKey, normalizeTemplate, timetableColors, findRoomProfile } from './timetable-model.js';
+import { weekDays, localDay, detailKey, timetableColors, findRoomProfile, normalizeTimetables } from './timetable-model.js';
 export function createTimetable({db,getUser,getWeekStart}) {
   const $ = id => document.getElementById(id);
   const escape = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const checked = result => { if(result.error) throw result.error; return result.data; };
   let owner=null, generation=0, template={rows:[]}, draft=null, details=new Map(), anchor=new Date(), loaded=false, editing=false, loading=false, saving=false, cellTarget=null, loadSequence=0, weekLoading=false;
+  let collection=normalizeTimetables(null), draftCollection=null;
   const message = text => { $('timetableMessage').textContent=text; };
   const current = () => editing ? draft : template;
   const roomProfiles = new Map();
-  function reset() { generation++; loadSequence++; owner=null; loaded=false; weekLoading=false; loading=false; editing=false; saving=false; draft=null; template={rows:[]}; details.clear(); roomProfiles.clear(); anchor=new Date(); cellTarget=null; $('timetableCellDialog').close(); $('timetableTable').innerHTML=''; $('timetableDetailsList').innerHTML=''; }
+  function reset() { generation++; loadSequence++; owner=null; loaded=false; weekLoading=false; loading=false; editing=false; saving=false; draft=null; draftCollection=null; collection=normalizeTimetables(null); template={rows:[]}; details.clear(); roomProfiles.clear(); anchor=new Date(); cellTarget=null; $('timetableCellDialog').close(); $('timetableTable').innerHTML=''; $('timetableDetailsList').innerHTML=''; }
   function render() {
     if(!owner) return;
     const days=weekDays(anchor,getWeekStart()), rows=current().rows;
     $('timetableWeekLabel').textContent=`${days[0].date} ~ ${days.at(-1).date}`;
     $('timetableSetup').hidden=!editing;
+    $('timetableActiveName').textContent=editing?'':collection.schedules.find(item=>item.id===collection.activeId)?.name || '';
+    if(editing){
+      const options=draftCollection.schedules.map(item=>`<option value="${escape(item.id)}">${escape(item.name)}</option>`).join('');
+      $('timetableChoose').innerHTML=options; $('timetableChoose').value=draft.id;
+      $('timetableDisplay').innerHTML=options; $('timetableDisplay').value=draftCollection.activeId;
+      $('timetableName').value=draft.name;
+    }
+    for(const id of ['timetableChoose','timetableDisplay','timetableName','timetableNew']) $(id).disabled=saving;
     $('timetableEdit').hidden=editing; $('timetableEdit').disabled=!loaded || saving;
     $('timetablePrev').disabled=saving; $('timetableNext').disabled=saving; $('timetableToday').disabled=saving;
     $('timetableAddRow').disabled=saving; $('timetableSave').disabled=saving; $('timetableCancel').disabled=saving;
@@ -26,6 +35,7 @@ export function createTimetable({db,getUser,getWeekStart}) {
       const separator=key.lastIndexOf(':'), rowId=key.slice(0,separator), date=key.slice(separator+1);
       if (!body || !days.some(day=>day.date===date)) continue;
       const row=template.rows.find(row=>row.id===rowId), day=days.find(day=>day.date===date), cell=row?.cells?.[day.weekday] || {};
+      if(!row && collection.schedules.some(item=>item.id!==collection.activeId && item.rows.some(other=>other.id===rowId))) continue;
       entries.push({rowId,date,body,row,cell,order:template.rows.indexOf(row)});
     }
     entries.sort((a,b)=>a.date.localeCompare(b.date)||a.order-b.order);
@@ -80,19 +90,25 @@ export function createTimetable({db,getUser,getWeekStart}) {
       message('시간표를 불러오는 중…'); render();
       const record=checked(await db.from('todo_timetables').select('*').eq('user_id',owner).maybeSingle());
       if(token!==generation)return;
-      template=normalizeTemplate(record?.template); loaded=true; message(''); render(); await loadWeek();
+      collection=normalizeTimetables(record?.template); template=collection.schedules.find(item=>item.id===collection.activeId); loaded=true; message(''); render(); await loadWeek();
     }catch(error){if(token===generation){message(`시간표 조회 실패: ${error.message} · ver1.14 SQL 실행 여부를 확인하세요.`);$('timetableRetry').hidden=false;}}
     finally{if(token===generation)loading=false;}
   }
-  $('timetableEdit').onclick=()=>{if(!loaded)return;roomProfiles.clear();draft=structuredClone(template);editing=true;message('');render();};
-  $('timetableCancel').onclick=()=>{editing=false;draft=null;message('');render();};
+  $('timetableEdit').onclick=()=>{if(!loaded)return;roomProfiles.clear();draftCollection=structuredClone(collection);draft=draftCollection.schedules.find(item=>item.id===draftCollection.activeId);editing=true;message('');render();};
+  $('timetableCancel').onclick=()=>{editing=false;draft=null;draftCollection=null;message('');render();};
+  $('timetableChoose').onchange=()=>{if(!editing || saving)return;draft=draftCollection.schedules.find(item=>item.id===$('timetableChoose').value);roomProfiles.clear();message('');render();};
+  $('timetableDisplay').onchange=()=>{if(editing && !saving)draftCollection.activeId=$('timetableDisplay').value;};
+  $('timetableName').oninput=()=>{if(!editing || saving)return;draft.name=$('timetableName').value.trim().slice(0,40) || '이름 없는 시간표';
+    for(const id of ['timetableChoose','timetableDisplay']){const value=$(id).value;$(id).innerHTML=draftCollection.schedules.map(item=>`<option value="${escape(item.id)}">${escape(item.name)}</option>`).join('');$(id).value=value;}
+  };
+  $('timetableNew').onclick=()=>{if(!editing || saving)return;draft={id:crypto.randomUUID(),name:`시간표 ${draftCollection.schedules.length+1}`,rows:[]};draftCollection.schedules.push(draft);roomProfiles.clear();message('새 시간표를 만들었습니다. 표시할 시간표를 선택한 후 저장하세요.');render();};
   $('timetableAddRow').onclick=()=>{if(!editing || saving)return;if(draft.rows.length>=100){message('행은 최대 100개까지 추가할 수 있습니다.');return;}draft.rows.push({id:crypto.randomUUID(),label:`${draft.rows.length+1}교시`,start:'',end:'',cells:{}});render();};
   $('timetableTable').oninput=e=>{if(!editing || saving)return;const row=draft.rows.find(r=>r.id===e.target.dataset.row);if(row && ['label','start','end'].includes(e.target.dataset.field))row[e.target.dataset.field]=e.target.value;};
   $('timetableSave').onclick=async()=>{
     if(!editing || saving)return;
-    if(draft.rows.some(r=>r.start && r.end && r.start>r.end)){message('종료 시간은 시작 시간보다 빠를 수 없습니다.');return;}
-    const token=generation, userId=owner, snapshot=normalizeTemplate(draft);saving=true;render();
-    try{checked(await db.from('todo_timetables').upsert({user_id:userId,template:snapshot,updated_at:new Date().toISOString()},{onConflict:'user_id'}).select('user_id').single());if(token!==generation)return;template=snapshot;draft=null;editing=false;message('시간표 설정을 저장하고 고정했습니다.');}
+    if(draftCollection.schedules.some(item=>item.rows.some(r=>r.start && r.end && r.start>r.end))){message('종료 시간은 시작 시간보다 빠를 수 없습니다.');return;}
+    const token=generation, userId=owner, snapshot=normalizeTimetables(draftCollection);saving=true;render();
+    try{checked(await db.from('todo_timetables').upsert({user_id:userId,template:snapshot,updated_at:new Date().toISOString()},{onConflict:'user_id'}).select('user_id').single());if(token!==generation)return;collection=snapshot;template=collection.schedules.find(item=>item.id===collection.activeId);draft=null;draftCollection=null;editing=false;message('시간표 설정을 저장하고 고정했습니다.');}
     catch(error){if(token===generation)message(`설정 저장 실패: ${error.message}`);}
     finally{if(token===generation){saving=false;render();}}
   };
