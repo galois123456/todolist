@@ -1,3 +1,5 @@
+import { createTimetableList } from './timetable-list.js';
+import { installColorPickers } from './color-pickers.js';
 import { appColors } from './app-colors.js';
 import { createTimetable } from './timetable.js';
 import { shareText, validateTimes, dateTimeLabel } from './schedule-share.js';
@@ -8,6 +10,7 @@ import { categoryColors, categoryColor } from './category-colors.js';
 import { taskOnDay, taskDates, validateTaskDates, resolveDate } from './calendar-dates.js';
 
 const $ = id => document.getElementById(id);
+const colorPickers=installColorPickers();
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const configured = /^https:\/\/.+\.supabase\.co\/?$/.test(url || '') && key && !key.includes('YOUR_');
@@ -23,7 +26,8 @@ const state = { user: null, tasks: [], categories: [], view: 'list', month: new 
 const priorityName = { high: '높음', medium: '보통', low: '낮음' };
 const $views = { list: $('listView'), calendar: $('calendarView'), input: $('inputView'), settings: $('settingsView'), notes: $('notesView'), timetable: $('timetableView') };
 const notes = createNotes({ db, getUser: () => state.user });
-const timetable = createTimetable({ db, getUser: () => state.user, getWeekStart: () => timetableWeekStart });
+const timetableList=createTimetableList({db,getUser:()=>state.user,onRender:renderTasks});
+const timetable = createTimetable({ db, getUser: () => state.user, getWeekStart: () => timetableWeekStart, onChange:()=>{timetableList.refresh();} });
 
 function localDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -62,7 +66,7 @@ $('timetableWeekSelect').onchange = event => {
   timetable.render();
 };
 
-function showAuth() { notes.reset(); timetable.reset(); $('auth').hidden = false; $('app').hidden = true; $('authMessage').textContent = ''; }
+function showAuth() { timetableList.reset(); notes.reset(); timetable.reset(); $('auth').hidden = false; $('app').hidden = true; $('authMessage').textContent = ''; }
 function showApp() { $('auth').hidden = true; $('app').hidden = false; $('accountEmail').textContent = state.user?.email || ''; }
 function setAuthMode(mode) {
   state.authMode = mode;
@@ -145,6 +149,7 @@ if (!db) {
 
 const desktopLayout = matchMedia('(min-width: 1280px)');
 function syncViews() {
+  document.querySelectorAll('.header-nav').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.view==='list'?['list','calendar','input'].includes(state.view):button.dataset.view===state.view)));
   document.querySelector('.main-wrap').classList.toggle('notes-page-active', ['notes','timetable'].includes(state.view));
   const split = desktopLayout.matches && !['settings', 'notes', 'timetable'].includes(state.view);
   document.querySelector('.content').classList.toggle('desktop-workspace', split);
@@ -153,6 +158,7 @@ function syncViews() {
 desktopLayout.addEventListener('change', () => { syncViews(); if (!['notes','settings','timetable'].includes(state.view)) renderCalendar(); });
 syncViews();
 function switchView(view) {
+  colorPickers.closeAll();
   if (state.view === 'timetable' && view !== 'timetable' && !timetable.canLeave()) return;
   if (view === 'input' && state.view !== 'input') prepareTask();
   if (state.view === 'notes' && view !== 'notes') notes.flush();
@@ -161,6 +167,7 @@ function switchView(view) {
   document.querySelectorAll('[data-view]').forEach(button => button.classList.toggle('active', button.dataset.view === view));
   if (view === 'calendar' || (desktopLayout.matches && !['settings','notes','timetable'].includes(view))) renderCalendar();
   if (view === 'settings') renderCategories();
+  if (view === 'list' && state.user) timetableList.refresh();
   if (view === 'notes') notes.open();
   if (view === 'timetable') timetable.open();
   window.scrollTo(0, 0);
@@ -193,6 +200,7 @@ function renderCategoryOptions() {
   $('categoryFilter').value = state.categories.some(c => c.id === selected) ? selected : 'all';
 }
 function renderTasks() {
+  if(timetableList.render())return;
   const keyword = $('search').value.trim().toLocaleLowerCase(); const status = $('statusFilter').value; const cat = $('categoryFilter').value; const today = localDate(new Date());
   const rank = { high: 0, medium: 1, low: 2 };
   const items = state.tasks.filter(t => {
@@ -245,7 +253,7 @@ function renderCalendar() {
   }).join('');
   const matches = state.tasks.filter(t => taskOnDay(t, state.selected)).sort((a, b) => Number(a.completed) - Number(b.completed));
   $('agendaDate').textContent = new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).format(parseLocal(state.selected));
-  $('agendaList').innerHTML = matches.length ? matches.map(t => `<div class="agenda-item"><div class="agenda-item-heading"><button type="button" data-edit="${escapeHtml(t.id)}">${t.completed ? '✓ ' : ''}${escapeHtml(t.title)}</button><button class="agenda-share" type="button" data-share="${escapeHtml(t.id)}" aria-label="일정 공유 텍스트 복사">공유</button></div><small><span class="category-name" style="${categoryStyle(t.category_id)}">${escapeHtml(categoryName(t.category_id))}</span> · <span class="agenda-priority ${['high', 'medium', 'low'].includes(t.priority) ? t.priority : 'medium'}">중요도 ${priorityName[t.priority] || '보통'}</span>${t.completed ? ' · 완료' : ''}${t.yearly_repeat ? ' · 매년 반복' : ''}</small>${dateTimeLabel(t, state.selected) ? `<small>${escapeHtml(dateTimeLabel(t, state.selected))}</small>` : ''}${t.note ? `<p class="agenda-note">${escapeHtml(t.note)}</p>` : ''}</div>`).join('') : '<p class="muted">이 날짜의 일정이 없습니다.</p>';
+  $('agendaList').innerHTML = matches.length ? matches.map(t => `<div class="agenda-item"><div class="agenda-item-heading"><button type="button" data-edit="${escapeHtml(t.id)}">${t.completed ? '✓ ' : ''}${escapeHtml(t.title)}</button><button class="agenda-share" type="button" data-share="${escapeHtml(t.id)}" aria-label="일정 공유 텍스트 복사">공유 복사</button></div><small><span class="category-name" style="${categoryStyle(t.category_id)}">${escapeHtml(categoryName(t.category_id))}</span> · <span class="agenda-priority ${['high', 'medium', 'low'].includes(t.priority) ? t.priority : 'medium'}">중요도 ${priorityName[t.priority] || '보통'}</span>${t.completed ? ' · 완료' : ''}${t.yearly_repeat ? ' · 매년 반복' : ''}</small>${dateTimeLabel(t, state.selected) ? `<small>${escapeHtml(dateTimeLabel(t, state.selected))}</small>` : ''}${t.note ? `<p class="agenda-note">${escapeHtml(t.note)}</p>` : ''}</div>`).join('') : '<p class="muted">이 날짜의 일정이 없습니다.</p>';
 }
 let lastCalendarTap = null;
 $('calendarGrid').onclick = e => {
@@ -259,13 +267,7 @@ $('agendaList').onclick = async e => {
   const share = e.target.closest('[data-share]');
   if (share) {
     const task = state.tasks.find(t => t.id === share.dataset.share); if (!task) return;
-    const text = shareText(task, state.selected);
-    try { await navigator.clipboard.writeText(text); showNotice('일정 내용을 복사했습니다. 원하는 곳에 붙여넣으세요.'); }
-    catch {
-      const input = document.createElement('textarea'); input.value = text; document.body.append(input); input.select();
-      const copied = document.execCommand('copy'); input.remove();
-      if (copied) showNotice('일정 내용을 복사했습니다.'); else prompt('아래 일정 내용을 복사하세요.', text);
-    }
+    await copySchedule(task, state.selected);
     return;
   }
   const target = e.target.closest('[data-edit]'); if (target) openTask(target.dataset.edit);
@@ -283,14 +285,31 @@ function prepareTask(id = null, dueDate = '') {
   $('taskPriority').value = t?.priority || 'medium'; $('taskLunar').checked = !!t?.is_lunar; $('taskYearly').checked = !!t?.yearly_repeat; $('taskLeap').checked = !!t?.lunar_leap; syncDateLimits(); const dates = t ? taskDates(t) : {}; $('taskStart').value = dates.start || ''; $('taskDue').value = dates.due || dueDate; syncDateLimits();
 }
 function openTask(id = null, dueDate = '') { switchView('input'); prepareTask(id, dueDate); document.activeElement?.blur(); $('inputView').scrollIntoView({ block: 'start' }); }
-$('closeDialog').onclick = $('cancelDialog').onclick = () => { prepareTask(); switchView('list'); };
+async function copySchedule(task, selected) {
+  const text=shareText(task,selected);
+  try { await navigator.clipboard.writeText(text); showNotice('일정 내용을 복사했습니다. 원하는 곳에 붙여넣으세요.'); }
+  catch {
+    const input=document.createElement('textarea');input.value=text;input.style.cssText='position:fixed;left:-9999px';document.body.append(input);input.select();
+    let copied=false;try{copied=document.execCommand('copy');}catch{}finally{input.remove();}
+    if(copied)showNotice('일정 내용을 복사했습니다.');else prompt('아래 일정 내용을 복사하세요.',text);
+  }
+}
+function readTaskForm() {
+  const lunar=$('taskLunar').checked;
+  const options={is_lunar:lunar,yearly_repeat:$('taskYearly').checked,lunar_leap:lunar && $('taskLeap').checked,lunar_start:lunar?$('taskStart').value || null:null,lunar_due:lunar?$('taskDue').value || null:null,start_date:lunar?null:$('taskStart').value || null,due_date:lunar?null:$('taskDue').value || null};
+  const times={start_time:$('taskStartTime').value || null,due_time:$('taskDueTime').value || null};
+  const dates=validateTaskDates(options);validateTimes(options,times,dates);
+  return {title:$('taskTitle').value.trim(),note:$('taskNote').value.trim(),category_id:$('taskCategory').value,priority:$('taskPriority').value,...options,...times,start_date:dates.start,due_date:dates.due};
+}
+$('shareTask').onclick=async()=>{
+  try{const task=readTaskForm();if(!task.title)throw new Error('공유할 일정 제목을 입력하세요.');$('taskError').textContent='';await copySchedule(task);}
+  catch(error){$('taskError').textContent=errorText(error);}
+};
+$('cancelDialog').onclick = () => { prepareTask(); switchView('list'); };
 $('taskForm').onsubmit = async event => {
   event.preventDefault(); if (state.loading) return;
-  let dates; const lunar = $('taskLunar').checked; const yearly = $('taskYearly').checked;
-  const options = { is_lunar: lunar, yearly_repeat: yearly, lunar_leap: lunar && $('taskLeap').checked, lunar_start: lunar ? $('taskStart').value || null : null, lunar_due: lunar ? $('taskDue').value || null : null, start_date: lunar ? null : $('taskStart').value || null, due_date: lunar ? null : $('taskDue').value || null };
-  const times = { start_time: $('taskStartTime').value || null, due_time: $('taskDueTime').value || null };
-  try { dates = validateTaskDates(options); validateTimes(options, times, dates); } catch(error) { $('taskError').textContent = error.message; return; }
-  const values = { user_id: state.user.id, title: $('taskTitle').value.trim(), note: $('taskNote').value.trim(), category_id: $('taskCategory').value, priority: $('taskPriority').value, ...options, ...times, start_date: dates.start, due_date: dates.due, updated_at: new Date().toISOString() };
+  let values;
+  try { values={user_id:state.user.id,...readTaskForm(),updated_at:new Date().toISOString()}; } catch(error) { $('taskError').textContent=error.message; return; }
   if (!values.title || !values.category_id) { $('taskError').textContent = '제목과 일정 분야를 확인하세요.'; return; }
   busy(true);
   try {

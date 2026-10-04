@@ -29,3 +29,10 @@ export function normalizeTimetables(value) {
   const activeId=schedules.some(item=>item.id===value?.activeId)?value.activeId:schedules[0].id;
   return {schedules,activeId,rows:schedules.find(item=>item.id===activeId).rows};
 }
+
+export function duplicateTimetable(source) {
+  const copy=normalizeTemplate(source);
+  // New row IDs keep date-specific details independent from the original.
+  copy.rows.forEach(row=>{row.id=crypto.randomUUID();});
+  return {id:crypto.randomUUID(),name:`${source.name.slice(0,36)} 복사본`,...copy};
+}

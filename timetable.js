@@ -1,5 +1,5 @@
-import { weekDays, localDay, detailKey, timetableColors, findRoomProfile, normalizeTimetables } from './timetable-model.js';
-export function createTimetable({db,getUser,getWeekStart}) {
+import { weekDays, localDay, detailKey, timetableColors, findRoomProfile, normalizeTimetables, duplicateTimetable } from './timetable-model.js';
+export function createTimetable({db,getUser,getWeekStart,onChange=()=>{}}) {
   const $ = id => document.getElementById(id);
   const escape = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const checked = result => { if(result.error) throw result.error; return result.data; };
@@ -21,7 +21,7 @@ export function createTimetable({db,getUser,getWeekStart}) {
       $('timetableDisplay').innerHTML=options; $('timetableDisplay').value=draftCollection.activeId;
       $('timetableName').value=draft.name;
     }
-    for(const id of ['timetableChoose','timetableDisplay','timetableName','timetableNew']) $(id).disabled=saving;
+    for(const id of ['timetableChoose','timetableDisplay','timetableName','timetableNew','timetableCopy']) $(id).disabled=saving;
     $('timetableEdit').hidden=editing; $('timetableEdit').disabled=!loaded || saving;
     $('timetablePrev').disabled=saving; $('timetableNext').disabled=saving; $('timetableToday').disabled=saving;
     $('timetableAddRow').disabled=saving; $('timetableSave').disabled=saving; $('timetableCancel').disabled=saving;
@@ -66,7 +66,7 @@ export function createTimetable({db,getUser,getWeekStart}) {
     if(edit){openDetail(edit.dataset.detailEdit,edit.dataset.detailDate);return;}
     if(!remove || !confirm('이 날짜의 세부사항을 삭제할까요?'))return;
     const token=generation,userId=owner,rowId=remove.dataset.detailDelete,date=remove.dataset.detailDate; saving=true;render();
-    try{checked(await db.from('todo_timetable_details').delete().eq('user_id',userId).eq('row_id',rowId).eq('entry_date',date).select('row_id'));if(token!==generation)return;details.delete(detailKey(rowId,date));message('세부사항을 삭제했습니다.');}
+    try{checked(await db.from('todo_timetable_details').delete().eq('user_id',userId).eq('row_id',rowId).eq('entry_date',date).select('row_id'));if(token!==generation)return;details.delete(detailKey(rowId,date));message('세부사항을 삭제했습니다.');onChange();}
     catch(error){if(token===generation)message(`삭제 실패: ${error.message}`);}
     finally{if(token===generation){saving=false;render();}}
   };
@@ -102,13 +102,14 @@ export function createTimetable({db,getUser,getWeekStart}) {
     for(const id of ['timetableChoose','timetableDisplay']){const value=$(id).value;$(id).innerHTML=draftCollection.schedules.map(item=>`<option value="${escape(item.id)}">${escape(item.name)}</option>`).join('');$(id).value=value;}
   };
   $('timetableNew').onclick=()=>{if(!editing || saving)return;draft={id:crypto.randomUUID(),name:`시간표 ${draftCollection.schedules.length+1}`,rows:[]};draftCollection.schedules.push(draft);roomProfiles.clear();message('새 시간표를 만들었습니다. 표시할 시간표를 선택한 후 저장하세요.');render();};
+  $('timetableCopy').onclick=()=>{if(!editing || saving)return;draft=duplicateTimetable(draft);draftCollection.schedules.push(draft);roomProfiles.clear();message('시간표를 복사했습니다. 이름과 내용을 편집한 후 저장하세요.');render();};
   $('timetableAddRow').onclick=()=>{if(!editing || saving)return;if(draft.rows.length>=100){message('행은 최대 100개까지 추가할 수 있습니다.');return;}draft.rows.push({id:crypto.randomUUID(),label:`${draft.rows.length+1}교시`,start:'',end:'',cells:{}});render();};
   $('timetableTable').oninput=e=>{if(!editing || saving)return;const row=draft.rows.find(r=>r.id===e.target.dataset.row);if(row && ['label','start','end'].includes(e.target.dataset.field))row[e.target.dataset.field]=e.target.value;};
   $('timetableSave').onclick=async()=>{
     if(!editing || saving)return;
     if(draftCollection.schedules.some(item=>item.rows.some(r=>r.start && r.end && r.start>r.end))){message('종료 시간은 시작 시간보다 빠를 수 없습니다.');return;}
     const token=generation, userId=owner, snapshot=normalizeTimetables(draftCollection);saving=true;render();
-    try{checked(await db.from('todo_timetables').upsert({user_id:userId,template:snapshot,updated_at:new Date().toISOString()},{onConflict:'user_id'}).select('user_id').single());if(token!==generation)return;collection=snapshot;template=collection.schedules.find(item=>item.id===collection.activeId);draft=null;draftCollection=null;editing=false;message('시간표 설정을 저장하고 고정했습니다.');}
+    try{checked(await db.from('todo_timetables').upsert({user_id:userId,template:snapshot,updated_at:new Date().toISOString()},{onConflict:'user_id'}).select('user_id').single());if(token!==generation)return;collection=snapshot;template=collection.schedules.find(item=>item.id===collection.activeId);draft=null;draftCollection=null;editing=false;message('시간표 설정을 저장하고 고정했습니다.');onChange();}
     catch(error){if(token===generation)message(`설정 저장 실패: ${error.message}`);}
     finally{if(token===generation){saving=false;render();}}
   };
@@ -125,7 +126,7 @@ export function createTimetable({db,getUser,getWeekStart}) {
     $('timetableRoom').value=cell.room || '';$('timetableSubject').value=cell.subject || '';selectColor(cell.color || 'white');
     $('timetableAutofill').textContent='';
     $('timetableRooms').innerHTML=[...new Set(current().rows.flatMap(r=>Object.values(r.cells).map(c=>c.room)).filter(Boolean))].map(room=>`<option value="${escape(room)}"></option>`).join('');
-    $('timetableDetail').value=details.get(detailKey(row.id,cellTarget.date)) || '';$('timetableCellError').textContent='';$('timetableCellDialog').showModal();
+    $('timetableDetail').value=details.get(detailKey(row.id,cellTarget.date)) || '';$('timetableCellError').textContent='';$('timetableColorPicker').open=false;$('timetableCellDialog').showModal();
   };
   selectColor('white');
   $('timetableCellCancel').onclick=()=>$('timetableCellDialog').close();
@@ -134,7 +135,7 @@ export function createTimetable({db,getUser,getWeekStart}) {
     const target={...cellTarget};
     if(target.editing){const row=draft.rows.find(r=>r.id===target.rowId);if(row)row.cells[target.day]={room:$('timetableRoom').value.trim(),subject:$('timetableSubject').value.trim(),color:$('timetableColor').value};if(row?.cells[target.day].room)roomProfiles.set(row.cells[target.day].room,{...row.cells[target.day]});$('timetableCellDialog').close();render();return;}
     const userId=owner, body=$('timetableDetail').value.trim();$('timetableCellSave').disabled=true;$('timetableCellCancel').disabled=true;
-    try{checked(await db.from('todo_timetable_details').upsert({user_id:userId,row_id:target.rowId,entry_date:target.date,body,updated_at:new Date().toISOString()},{onConflict:'user_id,row_id,entry_date'}).select('row_id').single());if(target.generation!==generation)return;details.set(detailKey(target.rowId,target.date),body);$('timetableCellDialog').close();message('해당 날짜의 세부사항을 저장했습니다.');render();}
+    try{checked(await db.from('todo_timetable_details').upsert({user_id:userId,row_id:target.rowId,entry_date:target.date,body,updated_at:new Date().toISOString()},{onConflict:'user_id,row_id,entry_date'}).select('row_id').single());if(target.generation!==generation)return;details.set(detailKey(target.rowId,target.date),body);$('timetableCellDialog').close();message('해당 날짜의 세부사항을 저장했습니다.');onChange();render();}
     catch(error){if(target.generation===generation)$('timetableCellError').textContent=`저장 실패: ${error.message}`;}
     finally{$('timetableCellSave').disabled=false;$('timetableCellCancel').disabled=false;}
   };

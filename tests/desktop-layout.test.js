@@ -6,7 +6,7 @@ test('넓은 화면 3열, 설정 단독, 좁은 화면 선택 탭, 입력값 유
   const source = readFileSync(new URL('../src.js', import.meta.url), 'utf8');
   const body = source.slice(source.indexOf('function syncViews()'), source.indexOf("desktopLayout.addEventListener"));
   const views = Object.fromEntries(['list','calendar','input','settings','notes'].map(name => [name, { hidden: true }]));
-  const ctx = { desktopLayout: { matches: true }, state: { view: 'list' }, $views: views, document: { querySelector: () => ({ classList: { toggle() {} } }) } };
+  const ctx = { desktopLayout: { matches: true }, state: { view: 'list' }, $views: views, document: { querySelectorAll:()=>[], querySelector: () => ({ classList: { toggle() {} } }) } };
   vm.createContext(ctx); vm.runInContext(body, ctx);
   ctx.syncViews(); assert.deepEqual(Object.values(views).map(v => v.hidden), [false,false,false,true,true]);
   ctx.state.view = 'settings'; ctx.syncViews(); assert.deepEqual(Object.values(views).map(v => v.hidden), [true,true,true,false,true]);

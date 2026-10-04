@@ -7,7 +7,7 @@ export function validateTimes(task, times, dates = taskDates(task)) {
   }
   if (dates.start && dates.start === dates.due && times.start_time && times.due_time && time(times.start_time) > time(times.due_time)) throw new Error('같은 날짜의 마감 시간은 시작 시간보다 빠를 수 없습니다.');
 }
-export function dateTimeLabel(task, selected) {
+export function dateTimeLabel(task, selected, formatDate = date => date) {
   let dates = { start: task.start_date, due: task.due_date };
   if (task.yearly_repeat && selected) {
     const raw = taskDates(task), base = Number((raw.start || raw.due).slice(0,4)), target = Number(selected.slice(0,4));
@@ -20,11 +20,16 @@ export function dateTimeLabel(task, selected) {
       } catch {}
     }
   }
-  const label = (date, clock) => date ? `${date}${clock ? ' ' + time(clock) : ''}` : '';
+  const label = (date, clock) => date ? `${formatDate(date)}${clock ? ' ' + time(clock) : ''}` : '';
   const start = label(dates.start, task.start_time), due = label(dates.due, task.due_time);
   return start && due ? `${start} ~ ${due}` : start || due;
 }
 export function shareText(task, selected) {
-  const dates = dateTimeLabel(task, selected);
-  return [task.title, dates ? `날짜: ${dates}` : '', task.note].filter(Boolean).join('\n');
+  const dates = dateTimeLabel(task, selected, shareDate);
+  return [`<${task.title}>`, dates ? `날짜 : ${dates}` : '', `내용 : ${task.note || ''}`].filter(Boolean).join('\n\n');
+}
+export function shareDate(value) {
+  const [year,month,day]=value.split('-').map(Number);
+  const weekday='일월화수목금토'[new Date(year,month-1,day).getDay()];
+  return `${year}. ${month}. ${day}.(${weekday})`;
 }
