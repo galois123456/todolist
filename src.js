@@ -26,7 +26,7 @@ const state = { user: null, tasks: [], categories: [], view: 'list', month: new 
 const priorityName = { high: '높음', medium: '보통', low: '낮음' };
 const $views = { list: $('listView'), calendar: $('calendarView'), input: $('inputView'), settings: $('settingsView'), notes: $('notesView'), timetable: $('timetableView') };
 const notes = createNotes({ db, getUser: () => state.user });
-const timetableList=createTimetableList({db,getUser:()=>state.user,onRender:renderTasks});
+const timetableList=createTimetableList({db,getUser:()=>state.user,onRender:renderTasks,onEdit:item=>timetable.editDetail(item),onCopy:copyText,onChanged:()=>timetable.render()});
 const timetable = createTimetable({ db, getUser: () => state.user, getWeekStart: () => timetableWeekStart, onChange:()=>{timetableList.refresh();} });
 
 function localDate(date) {
@@ -286,7 +286,9 @@ function prepareTask(id = null, dueDate = '') {
 }
 function openTask(id = null, dueDate = '') { switchView('input'); prepareTask(id, dueDate); document.activeElement?.blur(); $('inputView').scrollIntoView({ block: 'start' }); }
 async function copySchedule(task, selected) {
-  const text=shareText(task,selected);
+  return copyText(shareText(task,selected));
+}
+async function copyText(text) {
   try { await navigator.clipboard.writeText(text); showNotice('일정 내용을 복사했습니다. 원하는 곳에 붙여넣으세요.'); }
   catch {
     const input=document.createElement('textarea');input.value=text;input.style.cssText='position:fixed;left:-9999px';document.body.append(input);input.select();

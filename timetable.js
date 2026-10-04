@@ -53,12 +53,17 @@ export function createTimetable({db,getUser,getWeekStart,onChange=()=>{}}) {
     $('timetableAutofill').textContent='';
     if(profile){$('timetableSubject').value=profile.subject;selectColor(profile.color);$('timetableAutofill').textContent='기존 반의 과목과 색상을 채웠습니다. 필요하면 수정하세요.';}
   };
-  function openDetail(rowId,date) {
-    const row=template.rows.find(row=>row.id===rowId);
+  function openDetail(rowId,date,context=null) {
+    const row=context?.row || template.rows.find(row=>row.id===rowId);
     cellTarget={rowId,date,day:new Date(date+'T12:00:00').getDay(),editing:false,generation};
     $('timetableCellTitle').textContent=`${date} · ${row?.label || '삭제된 행'}`;
     $('timetableBaseFields').hidden=true; $('timetableDetailField').hidden=false;
-    $('timetableDetail').value=details.get(detailKey(rowId,date)) || ''; $('timetableCellError').textContent=''; $('timetableCellDialog').showModal();
+    $('timetableDetail').value=context?context.body:details.get(detailKey(rowId,date)) || ''; $('timetableCellError').textContent=''; $('timetableColorPicker').open=false; $('timetableCellDialog').showModal();
+  }
+  function editDetail(item) {
+    const user=getUser();if(!user || !db || saving)return;
+    if(owner!==user.id){reset();owner=user.id;}
+    openDetail(item.row_id,item.entry_date,item);
   }
   $('timetableDetailsList').onclick=async e=>{
     if(editing || saving || weekLoading)return;
@@ -142,5 +147,5 @@ export function createTimetable({db,getUser,getWeekStart,onChange=()=>{}}) {
   function move(amount){anchor.setDate(anchor.getDate()+amount);details.clear();render();loadWeek();}
   $('timetablePrev').onclick=()=>move(-7);$('timetableNext').onclick=()=>move(7);$('timetableToday').onclick=()=>{anchor=new Date();details.clear();render();loadWeek();};
   $('timetableRetry').onclick=()=>loaded?loadWeek():open();
-  return {open,reset,canLeave:()=>!saving && (!editing || confirm('저장하지 않은 시간표 설정이 있습니다. 화면을 이동할까요?')),render:()=>{render();if(loaded)loadWeek();}};
+  return {open,reset,editDetail,canLeave:()=>!saving && (!editing || confirm('저장하지 않은 시간표 설정이 있습니다. 화면을 이동할까요?')),render:()=>{render();if(loaded)loadWeek();}};
 }

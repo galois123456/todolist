@@ -26,7 +26,7 @@ export function dateTimeLabel(task, selected, formatDate = date => date) {
 }
 export function shareText(task, selected) {
   const dates = dateTimeLabel(task, selected, shareDate);
-  return [`<${task.title}>`, dates ? `날짜 : ${dates}` : '', `내용 : ${task.note || ''}`].filter(Boolean).join('\n\n');
+  return `<${task.title}>\n\n` + [dates ? `날짜 : ${dates}` : '', `내용 : ${task.note || ''}`].filter(Boolean).join('\n');
 }
 export function shareDate(value) {
   const [year,month,day]=value.split('-').map(Number);

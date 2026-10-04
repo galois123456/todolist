@@ -11,6 +11,6 @@ test('저장 전 입력값으로 공유하고 잘못된 날짜·시간은 복사
  Object.assign(nodes.taskTitle,{value:'수정 중 제목'});nodes.taskNote.value='저장 전 내용';nodes.taskStart.value='2026-10-13';nodes.taskStartTime.value='08:30';
  let copied='';const context={$:id=>nodes[id],validateTaskDates,validateTimes,copySchedule:async task=>{copied=shareText(task);},errorText:error=>error.message};
  vm.createContext(context);vm.runInContext(code,context);await nodes.shareTask.onclick();
- assert.equal(copied,'<수정 중 제목>\n\n날짜 : 2026. 10. 13.(화) 08:30\n\n내용 : 저장 전 내용');
+ assert.equal(copied,'<수정 중 제목>\n\n날짜 : 2026. 10. 13.(화) 08:30\n내용 : 저장 전 내용');
  copied='';nodes.taskDue.value='2026-10-12';await nodes.shareTask.onclick();assert.equal(copied,'');assert.ok(nodes.taskError.textContent);
 });

@@ -60,5 +60,20 @@
 .header-actions .header-nav{display:inline-flex;align-items:center;justify-content:center;min-width:72px;min-height:36px;padding:6px 12px;border-width:1px;border-style:solid;border-radius:10px;font-weight:750;line-height:1.2}
 .header-pill.timetable-link{background:#dcfce7;color:#166534;border-color:#86efac}
 :root[data-theme=dark] .header-pill.timetable-link{background:#14532d;color:#dcfce7;border-color:#22c55e}
-.header-actions .header-nav[aria-pressed=true]{box-shadow:inset 0 -3px 0 currentColor}
+.topbar .header-actions .header-pill.header-nav{background:var(--nav-soft);color:var(--nav-ink);border-color:var(--nav-border);box-shadow:none}
+.header-nav.tasks-link{--nav-soft:#eff6ff;--nav-ink:#2563eb;--nav-border:#bfdbfe;--nav-strong:#2563eb}
+.header-nav.notes-link{--nav-soft:#ffedd5;--nav-ink:#9a3412;--nav-border:#fdba74;--nav-strong:#c2410c}
+.header-nav.timetable-link{--nav-soft:#dcfce7;--nav-ink:#166534;--nav-border:#86efac;--nav-strong:#15803d}
+:root[data-theme=dark] .header-nav.tasks-link{--nav-soft:#172e54;--nav-ink:#bfdbfe;--nav-border:#3b82f6}
+:root[data-theme=dark] .header-nav.notes-link{--nav-soft:#482713;--nav-ink:#fed7aa;--nav-border:#ea580c}
+:root[data-theme=dark] .header-nav.timetable-link{--nav-soft:#153d29;--nav-ink:#bbf7d0;--nav-border:#22c55e}
+.topbar .header-actions .header-pill.header-nav[aria-pressed=true]{background:var(--nav-strong);border-color:var(--nav-strong);color:#fff;box-shadow:none}
+.topbar .header-actions .header-nav:focus:not(:focus-visible){outline:none}
+.topbar .header-actions .header-nav:focus-visible{outline:2px solid var(--nav-ink);outline-offset:2px}
+.timetable-list-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.timetable-list-title{padding:0;border:0;background:transparent;color:var(--text);font:inherit;font-weight:750;text-align:left;overflow-wrap:anywhere;min-width:0;cursor:pointer}
+.timetable-list-title:hover{text-decoration:underline}
+.timetable-list-actions{display:flex;flex:none;gap:2px}
+.timetable-list-actions .text-button{padding:3px 5px;white-space:nowrap;font-size:.8rem}
+.timetable-list-actions .detail-delete{color:var(--danger)}
 @media(max-width:760px){.topbar .header-actions .header-nav{width:100%;min-width:0;min-height:34px;padding:6px 3px}}

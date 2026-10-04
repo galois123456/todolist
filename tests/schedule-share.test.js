@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { shareText, validateTimes } from '../schedule-share.js';
 test('사용자가 요청한 공유 문구와 줄바꿈',()=>{
- assert.equal(shareText({title:'수학축전',start_date:'2026-10-13',due_date:'2026-10-15',start_time:'08:30',due_time:'16:30',note:'수학과 행사에 모두 참여해주시길 부탁드립니다.'}),'<수학축전>\n\n날짜 : 2026. 10. 13.(화) 08:30 ~ 2026. 10. 15.(목) 16:30\n\n내용 : 수학과 행사에 모두 참여해주시길 부탁드립니다.');
+ assert.equal(shareText({title:'수학축전',start_date:'2026-10-13',due_date:'2026-10-15',start_time:'08:30',due_time:'16:30',note:'수학과 행사에 모두 참여해주시길 부탁드립니다.'}),'<수학축전>\n\n날짜 : 2026. 10. 13.(화) 08:30 ~ 2026. 10. 15.(목) 16:30\n내용 : 수학과 행사에 모두 참여해주시길 부탁드립니다.');
 });
 test('공유에는 제목, 선택적인 날짜·시간과 내용만 포함',()=>{
  const task={title:'강의',note:'Zoom 강의',category_id:'private',priority:'high',start_date:'2026-10-14',due_date:'2026-10-14',start_time:'14:00:00',due_time:'14:50:00'};
- assert.equal(shareText(task),'<강의>\n\n날짜 : 2026. 10. 14.(수) 14:00 ~ 2026. 10. 14.(수) 14:50\n\n내용 : Zoom 강의');
- assert.equal(shareText({...task,start_date:null,start_time:null}),'<강의>\n\n날짜 : 2026. 10. 14.(수) 14:50\n\n내용 : Zoom 강의');
+ assert.equal(shareText(task),'<강의>\n\n날짜 : 2026. 10. 14.(수) 14:00 ~ 2026. 10. 14.(수) 14:50\n내용 : Zoom 강의');
+ assert.equal(shareText({...task,start_date:null,start_time:null}),'<강의>\n\n날짜 : 2026. 10. 14.(수) 14:50\n내용 : Zoom 강의');
  assert.equal(shareText({...task,start_date:null,due_date:null}),'<강의>\n\n내용 : Zoom 강의');
 });
 test('반복 일정은 선택한 해와 연도 경계의 실제 날짜를 공유',()=>{
