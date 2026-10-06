@@ -1,7 +1,7 @@
 {
   "name": "personal-school-todo",
   "private": true,
-  "version": "1.23.0",
+  "version": "1.24.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -13,6 +13,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.0.0",
     "fast-xml-parser": "^5.11.2",
+    "heic-to": "1.6.5",
     "korean-lunar-calendar": "^0.3.6"
   },
   "devDependencies": {

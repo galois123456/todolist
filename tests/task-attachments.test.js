@@ -1,0 +1,41 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+import {normalizeLink,validateAttachments} from '../task-attachments-model.js';
+test('링크 주소 보완, 위험한 프로토콜 및 사진 형식 거부',()=>{
+ assert.equal(normalizeLink({url:'example.com/a',name:' 안내 '}).url,'https://example.com/a');
+ for(const url of ['javascript:alert(1)','data:text/html,test','ftp://example.com','https://user:pass@example.com',''])assert.throws(()=>normalizeLink({url}));
+ assert.deepEqual(validateAttachments(null),{links:[],photos:[]});
+ assert.throws(()=>validateAttachments({links:[],photos:[{data:'data:image/svg+xml;base64,AAAA'}]}));
+ assert.throws(()=>validateAttachments({links:[],photos:Array(21).fill({data:'data:image/jpeg;base64,AAAA'})}));
+ const value={links:[{url:'https://example.com',name:'안내'}],photos:[{name:'사진',data:'data:image/jpeg;base64,AAAA'}]};
+ const copy=validateAttachments(value);copy.photos.pop();assert.equal(value.photos.length,1);
+});
+test('첨부 불러오기 실패 시 저장 차단, 오래된 응답 무시, 편집 취소·적용',async()=>{
+ const nodes=new Map();const $=id=>{if(!nodes.has(id))nodes.set(id,{hidden:false,disabled:false,textContent:'',innerHTML:'',value:'',addEventListener(){},close(){this.open=false;},showModal(){this.open=true;},querySelectorAll(){return [];}});return nodes.get(id);};
+ const queue=[];const db={from(){return {select(){return this;},eq(){return this;},single(){return new Promise(resolve=>queue.push(resolve));}};}};
+ let owner={id:'owner'};
+ const source=readFileSync(new URL('../task-attachments.js',import.meta.url),'utf8');
+ const code=source.slice(source.indexOf('const esc='),source.indexOf('export async function compressPhoto')).replace('export function','function')+'\nthis.create=createTaskAttachments;';
+ const ctx={document:{getElementById:$},structuredClone,validateAttachments,normalizeLink};vm.createContext(ctx);vm.runInContext(code,ctx);
+ const controller=ctx.create({db,getUser:()=>owner});
+ const first=controller.load('a');assert.throws(()=>controller.read());
+ const second=controller.load('b');queue[1]({data:{attachments:{links:[{url:'https://b.example',name:'B'}],photos:[]}}});await second;
+ queue[0]({data:{attachments:{links:[{url:'https://a.example'}],photos:[]}}});await first;
+ assert.equal(controller.read().links[0].name,'B');
+ $('editTaskLinks').onclick();$('attachmentAddLink').onclick();$('attachmentClose').onclick();assert.equal(controller.read().links.length,1);
+ $('editTaskLinks').onclick();$('attachmentsBody').onclick({target:{closest:s=>s==='[data-remove-link]'?{dataset:{removeLink:'0'}}:null}});$('attachmentApply').onclick();assert.equal(controller.read().links.length,0);
+ const failed=controller.load('bad');queue[2]({error:{message:'offline'}});await failed;assert.throws(()=>controller.read());
+ controller.reset();assert.equal(controller.read().links.length,0);
+});
+test('아이폰 HEIC: 브라우저 디코딩 실패 시 변환, JPEG 압축과 임시 주소 해제',async()=>{
+ const source=readFileSync(new URL('../task-attachments.js',import.meta.url),'utf8');
+ const code=source.slice(source.indexOf('export async function compressPhoto')).replace('export async function','async function').replace("await import('heic-to')",'await loadHeic()')+'\nthis.compress=compressPhoto;';
+ let decoded=0,converted=0,revoked=[];let canvas;
+ const ctx={Image:class{constructor(){this.naturalWidth=4000;this.naturalHeight=3000;}async decode(){if(++decoded===1)throw Object.assign(new Error('unsupported'),{name:'EncodingError'});}},URL:{createObjectURL:()=>`blob:${decoded}`,revokeObjectURL:url=>revoked.push(url)},document:{createElement(){return canvas={getContext:()=>({fillRect(){},drawImage(){}}),toDataURL:()=> 'data:image/jpeg;base64,AAAA'};}},loadHeic:async()=>({heicTo:async args=>{converted++;assert.equal(args.type,'image/jpeg');return {};}})};
+ vm.createContext(ctx);vm.runInContext(code,ctx);
+ const photo=await ctx.compress({name:'IMG_001.HEIC',type:'',size:4000000});
+ assert.equal(converted,1);assert.equal(canvas.width,1600);assert.equal(canvas.height,1200);assert.equal(photo.data,'data:image/jpeg;base64,AAAA');assert.equal(revoked.length,2);
+ await assert.rejects(()=>ctx.compress({name:'bad.txt',type:'text/plain',size:1}));
+});

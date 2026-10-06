@@ -1,3 +1,5 @@
+import { createTaskAttachments } from './task-attachments.js';
+import { validateAttachments } from './task-attachments-model.js';
 import { createTimetableList } from './timetable-list.js';
 import { installColorPickers } from './color-pickers.js';
 import { appColors } from './app-colors.js';
@@ -23,6 +25,7 @@ let weekStart = localStorage.getItem('school-todo-week-start') === 'sunday' ? 's
 let timetableWeekStart = localStorage.getItem('school-todo-timetable-week-start') || weekStart;
 if (!['sunday','monday','weekdays'].includes(timetableWeekStart)) timetableWeekStart = weekStart;
 const state = { user: null, tasks: [], categories: [], view: 'list', month: new Date(new Date().getFullYear(), new Date().getMonth(), 1), selected: localDate(new Date()), editId: null, authMode: 'login', loading: false };
+const attachments=createTaskAttachments({db,getUser:()=>state.user});
 const priorityName = { high: '높음', medium: '보통', low: '낮음' };
 const $views = { list: $('listView'), calendar: $('calendarView'), input: $('inputView'), settings: $('settingsView'), notes: $('notesView'), timetable: $('timetableView') };
 const notes = createNotes({ db, getUser: () => state.user });
@@ -66,7 +69,7 @@ $('timetableWeekSelect').onchange = event => {
   timetable.render();
 };
 
-function showAuth() { timetableList.reset(); notes.reset(); timetable.reset(); $('auth').hidden = false; $('app').hidden = true; $('authMessage').textContent = ''; }
+function showAuth() { attachments.reset(); timetableList.reset(); notes.reset(); timetable.reset(); $('auth').hidden = false; $('app').hidden = true; $('authMessage').textContent = ''; }
 function showApp() { $('auth').hidden = true; $('app').hidden = false; $('accountEmail').textContent = state.user?.email || ''; }
 function setAuthMode(mode) {
   state.authMode = mode;
@@ -123,7 +126,7 @@ async function loadData() {
     localStorage.setItem(`school-todo-categories-initialized-${state.user.id}`, '1');
     const tasks = [];
     for (let from = 0; ; from += 500) {
-      const page = checked(await db.from('todo_tasks').select('*').eq('user_id', state.user.id).order('created_at', { ascending: false }).range(from, from + 499));
+      const page = checked(await db.from('todo_tasks').select('id,user_id,category_id,title,note,priority,start_date,due_date,start_time,due_time,completed,created_at,updated_at,legacy_id,is_lunar,yearly_repeat,lunar_leap,lunar_start,lunar_due').eq('user_id', state.user.id).order('created_at', { ascending: false }).range(from, from + 499));
       tasks.push(...page); if (page.length < 500) break;
     }
     state.categories = categories; state.tasks = tasks; showNotice(''); renderAll();
@@ -226,7 +229,7 @@ $('taskList').addEventListener('click', async e => { const button = e.target.clo
 async function toggleTask(id, button) {
   const task = state.tasks.find(t => t.id === id); if (!task) return;
   const completed = !task.completed; button.disabled = true;
-  try { checked(await db.from('todo_tasks').update({ completed, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', state.user.id).select().single()); task.completed = completed; renderAll(); }
+  try { checked(await db.from('todo_tasks').update({ completed, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', state.user.id).select('id').single()); task.completed = completed; renderAll(); }
   catch (error) { button.disabled = false; showNotice(errorText(error), true); }
 }
 
@@ -278,7 +281,7 @@ $('currentMonth').onclick = () => { state.month = new Date(new Date().getFullYea
 $('addOnDate').onclick = () => openTask(null, state.selected);
 
 function prepareTask(id = null, dueDate = '') {
-  const t = state.tasks.find(item => item.id === id); state.editId = t?.id || null;
+  const t = state.tasks.find(item => item.id === id); state.editId = t?.id || null; attachments.load(state.editId);
   $('taskForm').reset(); $('dialogTitle').textContent = t ? '일정 수정' : '새 일정 입력'; $('deleteTask').hidden = !t; $('taskError').textContent = '';
   $('taskStartTime').value = t?.start_time?.slice(0,5) || ''; $('taskDueTime').value = t?.due_time?.slice(0,5) || '';
   $('taskTitle').value = t?.title || ''; $('taskNote').value = t?.note || ''; $('taskCategory').value = t?.category_id || state.categories[0]?.id || '';
@@ -311,19 +314,19 @@ $('cancelDialog').onclick = () => { prepareTask(); switchView('list'); };
 $('taskForm').onsubmit = async event => {
   event.preventDefault(); if (state.loading) return;
   let values;
-  try { values={user_id:state.user.id,...readTaskForm(),updated_at:new Date().toISOString()}; } catch(error) { $('taskError').textContent=error.message; return; }
+  try { values={user_id:state.user.id,...readTaskForm(),attachments:attachments.read(),updated_at:new Date().toISOString()}; } catch(error) { $('taskError').textContent=error.message; return; }
   if (!values.title || !values.category_id) { $('taskError').textContent = '제목과 일정 분야를 확인하세요.'; return; }
   busy(true);
   try {
-    if (state.editId) checked(await db.from('todo_tasks').update(values).eq('id', state.editId).eq('user_id', state.user.id).select().single());
-    else checked(await db.from('todo_tasks').insert(values).select().single());
+    if (state.editId) checked(await db.from('todo_tasks').update(values).eq('id', state.editId).eq('user_id', state.user.id).select('id').single());
+    else checked(await db.from('todo_tasks').insert(values).select('id').single());
     await loadData(); prepareTask(); switchView('list'); showNotice('일정을 저장했습니다.');
   } catch (error) { $('taskError').textContent = errorText(error); }
   finally { busy(false); }
 };
 $('deleteTask').onclick = async () => {
   const t = state.tasks.find(item => item.id === state.editId); if (!t || !confirm(`“${t.title}” 일정을 삭제할까요?`)) return;
-  busy(true); try { checked(await db.from('todo_tasks').delete().eq('id', t.id).eq('user_id', state.user.id).select().single()); await loadData(); prepareTask(); switchView('list'); showNotice('일정을 삭제했습니다.'); }
+  busy(true); try { checked(await db.from('todo_tasks').delete().eq('id', t.id).eq('user_id', state.user.id).select('id').single()); await loadData(); prepareTask(); switchView('list'); showNotice('일정을 삭제했습니다.'); }
   catch (error) { $('taskError').textContent = errorText(error); } finally { busy(false); }
 };
 
@@ -357,7 +360,7 @@ $('categoryList').onclick = async e => {
     const count = state.tasks.filter(t => t.category_id === category.id).length;
     localStorage.setItem(`school-todo-categories-initialized-${state.user.id}`, '1');
     if (!confirm(`“${category.name}” 분야와 이 분야의 일정 ${count}건을 함께 삭제할까요? 삭제한 데이터는 되돌릴 수 없습니다.`)) return;
-    try { checked(await db.from('todo_tasks').delete().eq('category_id', category.id).eq('user_id', state.user.id)); checked(await db.from('todo_categories').delete().eq('id', category.id).eq('user_id', state.user.id).select().single()); await loadData(); }
+    try { checked(await db.from('todo_tasks').delete().eq('category_id', category.id).eq('user_id', state.user.id)); checked(await db.from('todo_categories').delete().eq('id', category.id).eq('user_id', state.user.id).select('id').single()); await loadData(); }
     catch (error) { showNotice(errorText(error), true); }
   }
 };
@@ -392,9 +395,14 @@ function csvTime(value) {
 function download(name, content, type) {
   const a = document.createElement('a'); const link = URL.createObjectURL(new Blob([content], { type })); a.href = link; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(link), 30000);
 }
-$('exportJson').onclick = () => {
-  const data = { format: 'school-todo-v1', exportedAt: new Date().toISOString(), categories: state.categories.map(c => c.name), categoryColors: state.categories.map(c => ({ name: c.name, color: categoryColor(c, state.categories)[0] })), tasks: state.tasks.map(t => ({ id: t.legacy_id || t.id, title: t.title, note: t.note, category: categoryName(t.category_id), priority: t.priority, startDate: t.start_date, dueDate: t.due_date, startTime: t.start_time, dueTime: t.due_time, completed: t.completed, createdAt: t.created_at, updatedAt: t.updated_at, isLunar: t.is_lunar, yearlyRepeat: t.yearly_repeat, lunarLeap: t.lunar_leap, lunarStart: t.lunar_start, lunarDue: t.lunar_due })) };
+$('exportJson').onclick = async () => {
+  const owner=state.user.id; $('exportJson').disabled=true;
+  try {
+  const savedTasks=[];
+  for(const task of state.tasks){const row=checked(await db.from('todo_tasks').select('*').eq('id',task.id).eq('user_id',owner).single());if(state.user?.id!==owner)throw new Error('로그인 계정이 변경되었습니다.');savedTasks.push(row);}
+  const data = { format: 'school-todo-v1', exportedAt: new Date().toISOString(), categories: state.categories.map(c => c.name), categoryColors: state.categories.map(c => ({ name: c.name, color: categoryColor(c, state.categories)[0] })), tasks: savedTasks.map(t => ({attachments:t.attachments, id: t.legacy_id || t.id, title: t.title, note: t.note, category: categoryName(t.category_id), priority: t.priority, startDate: t.start_date, dueDate: t.due_date, startTime: t.start_time, dueTime: t.due_time, completed: t.completed, createdAt: t.created_at, updatedAt: t.updated_at, isLunar: t.is_lunar, yearlyRepeat: t.yearly_repeat, lunarLeap: t.lunar_leap, lunarStart: t.lunar_start, lunarDue: t.lunar_due })) };
   download(`학교일정_백업_${localDate(new Date())}.json`, JSON.stringify(data, null, 2), 'application/json;charset=utf-8');
+  }catch(error){showNotice(`백업 실패: ${errorText(error)}`,true);}finally{$('exportJson').disabled=false;}
 };
 async function ensureCategories(names) {
   const unique = [...new Set(names.map(s => String(s || '').trim()).filter(Boolean))];
@@ -413,7 +421,7 @@ function normalizeImported(raw, index) {
   const note = String(raw.note || ''); if (note.length > 10000) throw new Error(`${index}행: 메모가 너무 깁니다.`);
   const complete = raw.completed === true || ['true', 'TRUE', '1', '완료'].includes(String(raw.completed).trim());
   const legacy = String(raw.id || `row-${index}-${title}-${due || ''}`).trim();
-  return { ...options, ...times, title, note, category, priority, start, due, completed: complete, legacy_id: legacy, created_at: csvTime(raw.createdAt), updated_at: csvTime(raw.updatedAt) };
+  return { attachments:validateAttachments(raw.attachments), ...options, ...times, title, note, category, priority, start, due, completed: complete, legacy_id: legacy, created_at: csvTime(raw.createdAt), updated_at: csvTime(raw.updatedAt) };
 }
 async function importTasks(rows) {
   const normalized = rows.map((raw, i) => normalizeImported(raw, i + 2));
@@ -424,8 +432,8 @@ async function importTasks(rows) {
     seen.add(t.legacy_id); return true;
   });
   const catByName = new Map(state.categories.map(c => [c.name, c.id])); let saved = 0;
-  for (let i = 0; i < incoming.length; i += 100) {
-    const batch = incoming.slice(i, i + 100).map(t => ({ user_id: state.user.id, category_id: catByName.get(t.category), title: t.title, note: t.note, priority: t.priority, start_date: t.start, due_date: t.due, start_time: t.start_time, due_time: t.due_time, is_lunar: t.is_lunar, yearly_repeat: t.yearly_repeat, lunar_leap: t.lunar_leap, lunar_start: t.lunar_start, lunar_due: t.lunar_due, completed: t.completed, legacy_id: t.legacy_id, ...(t.created_at ? { created_at: t.created_at } : {}), ...(t.updated_at ? { updated_at: t.updated_at } : {}) }));
+  for (let i = 0; i < incoming.length; i += 1) {
+    const batch = incoming.slice(i, i + 1).map(t => ({ attachments:t.attachments, user_id: state.user.id, category_id: catByName.get(t.category), title: t.title, note: t.note, priority: t.priority, start_date: t.start, due_date: t.due, start_time: t.start_time, due_time: t.due_time, is_lunar: t.is_lunar, yearly_repeat: t.yearly_repeat, lunar_leap: t.lunar_leap, lunar_start: t.lunar_start, lunar_due: t.lunar_due, completed: t.completed, legacy_id: t.legacy_id, ...(t.created_at ? { created_at: t.created_at } : {}), ...(t.updated_at ? { updated_at: t.updated_at } : {}) }));
     checked(await db.from('todo_tasks').upsert(batch, { onConflict: 'user_id,legacy_id' })); saved += batch.length;
     $('importStatus').textContent = `${saved}건 가져옴…`;
   }
@@ -466,7 +474,7 @@ $('taskList').addEventListener('click', async e => {
   const task = state.tasks.find(t => t.id === button.dataset.delete);
   if (!task || !confirm(`“${task.title}” 일정을 삭제할까요?`)) return;
   button.disabled = true;
-  try { checked(await db.from('todo_tasks').delete().eq('id', task.id).eq('user_id', state.user.id).select().single()); await loadData(); showNotice('일정을 삭제했습니다.'); }
+  try { checked(await db.from('todo_tasks').delete().eq('id', task.id).eq('user_id', state.user.id).select('id').single()); await loadData(); showNotice('일정을 삭제했습니다.'); }
   catch (error) { button.disabled = false; showNotice(errorText(error), true); }
 });
 // 날짜 입력 제한: 미정은 허용
