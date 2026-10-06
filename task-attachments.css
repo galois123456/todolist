@@ -7,3 +7,11 @@
   #inputView .attachment-group>.text-button{min-height:30px;padding:3px 2px;font-size:12px;line-height:1.2}
   #inputView .task-attachments{margin-top:8px;margin-bottom:10px}
 }
+
+@media(min-width:761px){
+  .attachments-dialog .attachment-photo{display:flex;flex-direction:column;gap:6px}
+  .attachments-dialog .attachment-photo img{height:min(260px,calc(55dvh - 52px));max-height:min(260px,calc(55dvh - 52px));width:100%;object-fit:contain}
+  .attachments-dialog .attachment-photo figcaption{order:-1;min-height:36px;margin:0}
+  .attachments-dialog .attachment-photo figcaption span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .attachments-dialog .attachment-photo figcaption button{flex-shrink:0;color:var(--danger)}
+}

@@ -9,8 +9,7 @@ export function createTaskAttachments({db,getUser}) {
   function render(){
     $('taskLinks').textContent=value.links.length?`링크 (${value.links.length})`:'링크';
     $('taskPhotos').textContent=value.photos.length?`사진 보기 (${value.photos.length})`:'사진';
-    $('editTaskLinks').hidden=!value.links.length;$('editTaskPhotos').hidden=!value.photos.length;
-    for(const id of ['taskLinks','taskPhotos','editTaskLinks','editTaskPhotos'])$(id).disabled=!ready||processing;
+    for(const id of ['taskLinks','taskPhotos'])$(id).disabled=!ready||processing;
   }
   function reset(){generation++;value={links:[],photos:[]};ready=true;processing=false;dialog.close();status('');render();}
   async function load(id){
@@ -32,16 +31,16 @@ export function createTaskAttachments({db,getUser}) {
     $('attachmentApply').hidden=!editing;
     $('attachmentEdit').hidden=editing;
     $('attachmentError').textContent='';
+    $('attachmentsBody').scrollTop=0;
     $('attachmentsBody').innerHTML=kind==='links'?draft.links.map((link,i)=>editing?
       `<div class="attachment-link-edit"><label>이름 (선택)<input data-link-name="${i}" maxlength="100" value="${esc(link.name)}" placeholder="예: 행사 안내"></label><label>인터넷 주소<input data-link-url="${i}" type="url" value="${esc(link.url)}" placeholder="https://example.com"></label><button type="button" class="text-button" data-remove-link="${i}">삭제</button></div>`:
       `<a class="button secondary attachment-link" href="${esc(link.url)}" target="_blank" rel="noopener noreferrer">${esc(link.name||link.url)} ↗</a>`).join(''):
-      draft.photos.map((photo,i)=>`<figure class="attachment-photo"><img src="${esc(photo.data)}" alt="${esc(photo.name)}"><figcaption>${esc(photo.name)}${editing?`<button type="button" class="text-button" data-remove-photo="${i}">삭제</button>`:''}</figcaption></figure>`).join('');
+      draft.photos.map((photo,i)=>`<figure class="attachment-photo"><img src="${esc(photo.data)}" alt="${esc(photo.name)}"><figcaption><span title="${esc(photo.name)}">${esc(photo.name)}</span>${editing?`<button type="button" class="text-button" data-remove-photo="${i}">삭제</button>`:''}</figcaption></figure>`).join('');
     if(!draft[kind].length)$('attachmentsBody').textContent=kind==='links'?'등록한 링크가 없습니다.':'등록한 사진이 없습니다.';
   }
   function capture(){if(kind==='links'&&editing){for(const el of $('attachmentsBody').querySelectorAll('[data-link-name]'))draft.links[Number(el.dataset.linkName)].name=el.value;for(const el of $('attachmentsBody').querySelectorAll('[data-link-url]'))draft.links[Number(el.dataset.linkUrl)].url=el.value;}}
   $('taskLinks').onclick=()=>open('links',!value.links.length);
   $('taskPhotos').onclick=()=>open('photos',!value.photos.length);
-  $('editTaskLinks').onclick=()=>open('links',true);$('editTaskPhotos').onclick=()=>open('photos',true);
   $('attachmentEdit').onclick=()=>{editing=true;draw();};
   $('attachmentClose').onclick=()=>{if(!processing)dialog.close();};
   dialog.addEventListener('cancel',e=>{if(processing)e.preventDefault();});
