@@ -24,8 +24,8 @@ test('첨부 불러오기 실패 시 저장 차단, 오래된 응답 무시, 편
  const second=controller.load('b');queue[1]({data:{attachments:{links:[{url:'https://b.example',name:'B'}],photos:[]}}});await second;
  queue[0]({data:{attachments:{links:[{url:'https://a.example'}],photos:[]}}});await first;
  assert.equal(controller.read().links[0].name,'B');
- $('editTaskLinks').onclick();$('attachmentAddLink').onclick();$('attachmentClose').onclick();assert.equal(controller.read().links.length,1);
- $('editTaskLinks').onclick();$('attachmentsBody').onclick({target:{closest:s=>s==='[data-remove-link]'?{dataset:{removeLink:'0'}}:null}});$('attachmentApply').onclick();assert.equal(controller.read().links.length,0);
+ $('taskLinks').onclick();$('attachmentEdit').onclick();$('attachmentAddLink').onclick();$('attachmentClose').onclick();assert.equal(controller.read().links.length,1);
+ $('taskLinks').onclick();$('attachmentEdit').onclick();$('attachmentsBody').onclick({target:{closest:s=>s==='[data-remove-link]'?{dataset:{removeLink:'0'}}:null}});$('attachmentApply').onclick();assert.equal(controller.read().links.length,0);
  const failed=controller.load('bad');queue[2]({error:{message:'offline'}});await failed;assert.throws(()=>controller.read());
  controller.reset();assert.equal(controller.read().links.length,0);
 });

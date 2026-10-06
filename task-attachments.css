@@ -15,3 +15,13 @@
   .attachments-dialog .attachment-photo figcaption span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .attachments-dialog .attachment-photo figcaption button{flex-shrink:0;color:var(--danger)}
 }
+
+/* Photo actions above the image on mobile too. */
+@media(max-width:760px){
+ .attachments-dialog .attachment-photo{display:flex;flex-direction:column;gap:6px}
+ .attachments-dialog .attachment-photo figcaption{order:-1;min-height:44px;margin:0}
+ .attachments-dialog .attachment-photo figcaption span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .attachments-dialog .attachment-photo figcaption button{flex-shrink:0;min-height:44px;color:var(--danger)}
+}
+
+.attachments-dialog .attachment-link-edit [data-remove-link]{color:var(--danger)}
