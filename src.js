@@ -1,3 +1,4 @@
+import { dueInPeriod, compareCategories } from './task-filters.js';
 import { createTaskAttachments } from './task-attachments.js';
 import { validateAttachments } from './task-attachments-model.js';
 import { createTimetableList } from './timetable-list.js';
@@ -59,7 +60,7 @@ $('weekStartSelect').value = weekStart;
 $('weekStartSelect').onchange = event => {
   weekStart = event.target.value === 'sunday' ? 'sunday' : 'monday';
   localStorage.setItem('school-todo-week-start', weekStart);
-  renderCalendar();
+  renderCalendar(); renderTasks();
 };
 
 $('timetableWeekSelect').value = timetableWeekStart;
@@ -209,13 +210,14 @@ function renderTasks() {
   const items = state.tasks.filter(t => {
     if (cat !== 'all' && t.category_id !== cat) return false;
     if (keyword && !`${t.title} ${t.note}`.toLocaleLowerCase().includes(keyword)) return false;
-    return status === 'all' || (status === 'active' && !t.completed) || (status === 'done' && t.completed) || (status === 'today' && !t.completed && taskOnDay({ ...t, start_date: null, lunar_start: null }, today)) || (status === 'overdue' && isOverdue(t));
+    return status === 'all' || (status === 'active' && !t.completed) || (status === 'done' && t.completed) || (['today','week','month','threeDays'].includes(status) && dueInPeriod(t,status,today,weekStart)) || (status === 'overdue' && isOverdue(t));
   }).sort((a, b) => {
     const sort = $('sort').value;
     if (sort === 'priority') return rank[a.priority] - rank[b.priority] || (a.due_date || '9999').localeCompare(b.due_date || '9999');
     if (sort === 'start') return (a.start_date || '9999').localeCompare(b.start_date || '9999');
     if (sort === 'new') return b.created_at.localeCompare(a.created_at);
     if (sort === 'title') return a.title.localeCompare(b.title, 'ko');
+    if (sort === 'category') return compareCategories(a,b,state.categories);
     return (a.due_date || '9999').localeCompare(b.due_date || '9999') || rank[a.priority] - rank[b.priority];
   });
   $('shownCount').textContent = `${items.length}건`;

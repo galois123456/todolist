@@ -66,8 +66,8 @@ export function createTimetableList({db,getUser,onRender,onEdit=()=>{},onCopy=as
     $('sourceFilter').disabled=saving;
     $('taskStats').hidden=enabled;
     $('categoryFilter').disabled=enabled;$('statusFilter').disabled=enabled;
-    const priority=$('sort').querySelector('option[value="priority"]');if(priority)priority.disabled=enabled;
-    if(enabled && $('sort').value==='priority')$('sort').value='due';
+    for(const kind of ['priority','category']){const option=$('sort').querySelector(`option[value="${kind}"]`);if(option)option.disabled=enabled;}
+    if(enabled && ['priority','category'].includes($('sort').value))$('sort').value='due';
     $('search').placeholder=enabled?'시간표 과목·교실·세부사항 검색':'일정 제목 검색';
     $('listSourceMessage').textContent=error;$('listSourceRetry').hidden=!error;
     if(!enabled)return false;
