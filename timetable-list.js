@@ -105,5 +105,5 @@ export function createTimetableList({db,getUser,onRender,onEdit=()=>{},onCopy=as
   };
   $('sourceFilter').onchange=loadDetails;
   $('listSourceRetry').onclick=refresh;
-  return {refresh,reset,render};
+  return {refresh,reset,render,async setSource(id){const value=schedules.some(s=>s.id===id)?id:'tasks';if($('sourceFilter').value===value)return;$('sourceFilter').value=value;await loadDetails();}};
 }

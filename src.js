@@ -1,3 +1,4 @@
+import { createPreferences } from './preferences.js';
 import { dueInPeriod, compareCategories } from './task-filters.js';
 import { createTaskAttachments } from './task-attachments.js';
 import { validateAttachments } from './task-attachments-model.js';
@@ -33,6 +34,19 @@ const notes = createNotes({ db, getUser: () => state.user });
 const timetableList=createTimetableList({db,getUser:()=>state.user,onRender:renderTasks,onEdit:item=>timetable.editDetail(item),onCopy:copyText,onChanged:()=>timetable.render()});
 const timetable = createTimetable({ db, getUser: () => state.user, getWeekStart: () => timetableWeekStart, onChange:()=>{timetableList.refresh();} });
 
+
+const preferences=createPreferences({db,onStatus:message=>{$('preferencesStatus').textContent=message;},onApply:async value=>{
+  applyTheme(value.theme);
+  $('search').value=value.search;$('sort').value=value.sort;$('statusFilter').value=value.statusFilter;
+  $('categoryFilter').value=state.categories.some(c=>c.id===value.categoryFilter)?value.categoryFilter:'all';
+  await timetableList.setSource(value.sourceFilter);
+  renderTasks();
+}});
+window.addEventListener('focus',()=>preferences.sync());
+window.addEventListener('online',()=>preferences.sync());
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')preferences.sync();else preferences.flush().catch(()=>{});});
+window.addEventListener('pagehide',()=>{preferences.flush().catch(()=>{});});
+
 function localDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
@@ -54,8 +68,8 @@ function applyTheme(value) {
 }
 applyTheme(localStorage.getItem('school-todo-theme') || 'system');
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => applyTheme(localStorage.getItem('school-todo-theme') || 'system'));
-$('themeButton').onclick = () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
-$('themeSelect').onchange = event => applyTheme(event.target.value);
+$('themeButton').onclick = () => {const value=document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';applyTheme(value);preferences.patch({theme:value});};
+$('themeSelect').onchange = event => {applyTheme(event.target.value);preferences.patch({theme:event.target.value});};
 $('weekStartSelect').value = weekStart;
 $('weekStartSelect').onchange = event => {
   weekStart = event.target.value === 'sunday' ? 'sunday' : 'monday';
@@ -70,7 +84,7 @@ $('timetableWeekSelect').onchange = event => {
   timetable.render();
 };
 
-function showAuth() { attachments.reset(); timetableList.reset(); notes.reset(); timetable.reset(); $('auth').hidden = false; $('app').hidden = true; $('authMessage').textContent = ''; }
+function showAuth() { preferences.reset(); attachments.reset(); timetableList.reset(); notes.reset(); timetable.reset(); $('auth').hidden = false; $('app').hidden = true; $('authMessage').textContent = ''; }
 function showApp() { $('auth').hidden = true; $('app').hidden = false; $('accountEmail').textContent = state.user?.email || ''; }
 function setAuthMode(mode) {
   state.authMode = mode;
@@ -106,14 +120,17 @@ $('resetPassword').onclick = async () => {
   catch (error) { $('authMessage').textContent = errorText(error); }
 };
 $('signOut').onclick = async () => {
-  try { await notes.flush(); checked(await db.auth.signOut()); state.user = null; state.tasks = []; state.categories = []; showAuth(); setAuthMode('login'); }
+  try { await preferences.flush(); await notes.flush(); checked(await db.auth.signOut()); state.user = null; state.tasks = []; state.categories = []; showAuth(); setAuthMode('login'); }
   catch (error) { showNotice(errorText(error), true); }
 };
 
 async function enter(user) {
   if (state.user?.id === user.id && !$('app').hidden) return;
   state.user = user; showApp(); switchView('list');
-  await loadData();
+  const controls=['search','sort','statusFilter','categoryFilter','sourceFilter','themeButton','themeSelect'];
+  controls.forEach(id=>$(id).disabled=true);
+  try{await loadData();await timetableList.refresh();if(state.user?.id===user.id)await preferences.open(user.id);}
+  finally{controls.forEach(id=>$(id).disabled=false);renderTasks();}
 }
 async function loadData() {
   if (!state.user) return;
@@ -225,7 +242,8 @@ function renderTasks() {
   const active = items.filter(t => !t.completed), done = items.filter(t => t.completed);
   $('taskList').innerHTML = (active.length ? active.map(taskCard).join('') : '<div class="empty">진행 중인 일정이 없습니다.</div>') + (done.length ? `<div class="completed-section"><h3>완료한 일정</h3>${done.map(taskCard).join('')}</div>` : '');
 }
-['search', 'statusFilter', 'categoryFilter', 'sort'].forEach(id => $(id).addEventListener('input', renderTasks));
+['search', 'statusFilter', 'categoryFilter', 'sort'].forEach(id => $(id).addEventListener('input', () => {renderTasks();preferences.patch({[id]:$(id).value});}));
+$('sourceFilter').addEventListener('change',()=>preferences.patch({sourceFilter:$('sourceFilter').value,sort:$('sort').value}));
 $('taskList').addEventListener('click', e => { const button = e.target.closest('[data-edit]'); if (button) openTask(button.dataset.edit); });
 $('taskList').addEventListener('click', async e => { const button = e.target.closest('[data-toggle]'); if (button) await toggleTask(button.dataset.toggle, button); });
 async function toggleTask(id, button) {
