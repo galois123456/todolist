@@ -105,3 +105,14 @@ body,#app{width:100%;max-width:100%}
 .task-form-actions .button.danger:hover{background:#fecaca}
 :root[data-theme="dark"] .task-form-actions .button.danger{background:#48272d;color:#fca5a5}
 :root[data-theme="dark"] .task-form-actions .button.danger:hover{background:#5c3038}
+
+.app-title-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;min-width:0}
+.server-save-status{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;color:var(--muted);background:var(--stat)}
+.server-save-status:before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor}
+.server-save-status[data-state=saving]{background:#fef3c7;color:#92400e}
+.server-save-status[data-state=saved]{background:#dcfce7;color:#166534}
+.server-save-status[data-state=error]{background:#fee2e2;color:#b91c1c}
+:root[data-theme=dark] .server-save-status[data-state=saving]{background:#443719;color:#fde68a}
+:root[data-theme=dark] .server-save-status[data-state=saved]{background:#193e2c;color:#86efac}
+:root[data-theme=dark] .server-save-status[data-state=error]{background:#48272d;color:#fca5a5}
+@media(max-width:760px){.app-title-row{gap:6px 10px}.server-save-status{font-size:11px;padding:4px 8px}}

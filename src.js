@@ -1,3 +1,4 @@
+import { createSaveStatus } from './save-status.js';
 import { createPreferences } from './preferences.js';
 import { dueInPeriod, compareTasks } from './task-filters.js';
 import { createTaskAttachments } from './task-attachments.js';
@@ -18,7 +19,9 @@ const colorPickers=installColorPickers();
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const configured = /^https:\/\/.+\.supabase\.co\/?$/.test(url || '') && key && !key.includes('YOUR_');
+const saveStatus=createSaveStatus({onChange:({state,text,title})=>{const el=$('serverSaveStatus');el.dataset.state=state;el.textContent=text;el.title=title;}});
 const db = configured ? createClient(url, key, {
+  global: { fetch: saveStatus.fetch },
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
 }) : null;
 
@@ -84,7 +87,7 @@ $('timetableWeekSelect').onchange = event => {
   timetable.render();
 };
 
-function showAuth() { preferences.reset(); attachments.reset(); timetableList.reset(); notes.reset(); timetable.reset(); $('auth').hidden = false; $('app').hidden = true; $('authMessage').textContent = ''; }
+function showAuth() { saveStatus.reset(); preferences.reset(); attachments.reset(); timetableList.reset(); notes.reset(); timetable.reset(); $('auth').hidden = false; $('app').hidden = true; $('authMessage').textContent = ''; }
 function showApp() { $('auth').hidden = true; $('app').hidden = false; $('accountEmail').textContent = state.user?.email || ''; }
 function setAuthMode(mode) {
   state.authMode = mode;
