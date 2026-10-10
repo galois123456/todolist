@@ -101,4 +101,7 @@ body,#app{width:100%;max-width:100%}
 .task-save-actions{margin-left:auto}
 .task-form-actions>.spacer{display:none}
 .task-form-actions .button{padding:0 12px;min-height:44px}
-.task-form-actions .button.danger{padding-left:0}
+.task-form-actions .button.danger{padding:0 12px;background:#fee2e2;color:#b91c1c}
+.task-form-actions .button.danger:hover{background:#fecaca}
+:root[data-theme="dark"] .task-form-actions .button.danger{background:#48272d;color:#fca5a5}
+:root[data-theme="dark"] .task-form-actions .button.danger:hover{background:#5c3038}

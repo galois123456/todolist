@@ -6,8 +6,8 @@ test('계정별 필터·테마 저장, 다른 기기 복원, 변경한 필드만
  const s=server();let a,b;
  const first=createPreferences({db:s.db('a'),storage:storage(),onApply:v=>a=v});
  const second=createPreferences({db:s.db('a'),storage:storage(),onApply:v=>b=v});
- await first.open('a');first.patch({theme:'dark',sort:'category',sourceFilter:'schedule-1',statusFilter:'threeDays',search:'행사',categoryFilter:'school'});await first.flush();
- await second.open('a');assert.equal(b.theme,'dark');assert.equal(b.sourceFilter,'schedule-1');assert.equal(b.statusFilter,'threeDays');
+ await first.open('a');first.patch({theme:'dark',sort:'category',sourceFilter:'schedule-1',statusFilter:'fiveDays',search:'행사',categoryFilter:'school'});await first.flush();
+ await first.flush();first.patch({statusFilter:'sevenDays'});await first.flush();await second.open('a');assert.equal(b.theme,'dark');assert.equal(b.sourceFilter,'schedule-1');assert.equal(b.statusFilter,'sevenDays');
  second.patch({theme:'light'});await second.flush();first.patch({sort:'title'});await first.flush();await second.sync();assert.equal(b.theme,'light');assert.equal(b.sort,'title');
  let other;const third=createPreferences({db:s.db('b'),storage:storage(),onApply:v=>other=v});await third.open('b');assert.equal(other.search,'');assert.equal(other.theme,'system');
  first.reset();second.reset();third.reset();

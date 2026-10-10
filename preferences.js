@@ -1,7 +1,7 @@
 export const preferenceDefaults={theme:'system',search:'',statusFilter:'all',categoryFilter:'all',sort:'due',sourceFilter:'tasks'};
 export function normalizePreferences(raw={}){
  const value={...preferenceDefaults};
- for(const [key,allowed] of Object.entries({theme:['light','dark','system'],statusFilter:['all','active','done','today','week','month','threeDays','overdue'],sort:['due','priority','start','new','title','category']}))if(allowed.includes(raw[key]))value[key]=raw[key];
+ for(const [key,allowed] of Object.entries({theme:['light','dark','system'],statusFilter:['all','active','done','today','week','month','threeDays','fiveDays','sevenDays','overdue'],sort:['due','priority','start','new','title','category']}))if(allowed.includes(raw[key]))value[key]=raw[key];
  for(const key of ['search','categoryFilter','sourceFilter'])if(typeof raw[key]==='string')value[key]=raw[key].slice(0,key==='search'?500:100);
  return value;
 }

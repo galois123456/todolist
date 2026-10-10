@@ -5,7 +5,7 @@ export function dueInPeriod(task,period,today,weekStart='monday'){
  const [y,m,d]=today.split('-').map(Number),start=new Date(y,m-1,d,12),end=new Date(start);
  if(period==='week'){start.setDate(start.getDate()-(start.getDay()-(weekStart==='sunday'?0:1)+7)%7);end.setTime(start.getTime());end.setDate(end.getDate()+6);}
  else if(period==='month'){start.setDate(1);end.setMonth(end.getMonth()+1,0);}
- else if(period==='threeDays')end.setDate(end.getDate()+2);
+ else if(['threeDays','fiveDays','sevenDays'].includes(period))end.setDate(end.getDate()+({threeDays:2,fiveDays:4,sevenDays:6}[period]));
  else if(period!=='today')return false;
  const dueOnly={...task,start_date:null,lunar_start:null};
  for(const day=new Date(start);day<=end;day.setDate(day.getDate()+1))if(taskOnDay(dueOnly,key(day)))return true;
