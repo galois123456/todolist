@@ -1,5 +1,5 @@
 import { createPreferences } from './preferences.js';
-import { dueInPeriod, compareCategories } from './task-filters.js';
+import { dueInPeriod, compareTasks } from './task-filters.js';
 import { createTaskAttachments } from './task-attachments.js';
 import { validateAttachments } from './task-attachments-model.js';
 import { createTimetableList } from './timetable-list.js';
@@ -40,7 +40,7 @@ const preferences=createPreferences({db,onStatus:message=>{$('preferencesStatus'
   $('search').value=value.search;$('sort').value=value.sort;$('statusFilter').value=value.statusFilter;
   $('categoryFilter').value=state.categories.some(c=>c.id===value.categoryFilter)?value.categoryFilter:'all';
   await timetableList.setSource(value.sourceFilter);
-  renderTasks();
+  renderTasks(); renderCalendar();
 }});
 window.addEventListener('focus',()=>preferences.sync());
 window.addEventListener('online',()=>preferences.sync());
@@ -56,7 +56,7 @@ function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, c =>
 function showNotice(message, error = false) { const n = $('notice'); n.textContent = message; n.classList.toggle('error', error); n.hidden = !message; }
 function errorText(error) { return error?.message || '작업에 실패했습니다. 인터넷 연결을 확인하세요.'; }
 function checked(result) { if (result.error) throw result.error; return result.data; }
-function busy(value) { state.loading = value; $('saveTask').disabled = value; $('authSubmit').disabled = value; }
+function busy(value) { state.loading = value; $('saveTask').disabled = value; $('completeTask').disabled = value; $('deleteTask').disabled = value; $('authSubmit').disabled = value; }
 
 function applyTheme(value) {
   localStorage.setItem('school-todo-theme', value);
@@ -223,27 +223,18 @@ function renderCategoryOptions() {
 function renderTasks() {
   if(timetableList.render())return;
   const keyword = $('search').value.trim().toLocaleLowerCase(); const status = $('statusFilter').value; const cat = $('categoryFilter').value; const today = localDate(new Date());
-  const rank = { high: 0, medium: 1, low: 2 };
   const items = state.tasks.filter(t => {
     if (cat !== 'all' && t.category_id !== cat) return false;
     if (keyword && !`${t.title} ${t.note}`.toLocaleLowerCase().includes(keyword)) return false;
     return status === 'all' || (status === 'active' && !t.completed) || (status === 'done' && t.completed) || (['today','week','month','threeDays'].includes(status) && dueInPeriod(t,status,today,weekStart)) || (status === 'overdue' && isOverdue(t));
-  }).sort((a, b) => {
-    const sort = $('sort').value;
-    if (sort === 'priority') return rank[a.priority] - rank[b.priority] || (a.due_date || '9999').localeCompare(b.due_date || '9999');
-    if (sort === 'start') return (a.start_date || '9999').localeCompare(b.start_date || '9999');
-    if (sort === 'new') return b.created_at.localeCompare(a.created_at);
-    if (sort === 'title') return a.title.localeCompare(b.title, 'ko');
-    if (sort === 'category') return compareCategories(a,b,state.categories);
-    return (a.due_date || '9999').localeCompare(b.due_date || '9999') || rank[a.priority] - rank[b.priority];
-  });
+  }).sort((a,b)=>compareTasks(a,b,$('sort').value,state.categories));
   $('shownCount').textContent = `${items.length}건`;
   const taskCard = t => `<article class="task-card ${t.completed ? 'done' : ''} ${isOverdue(t) ? 'overdue' : ''} priority-${t.priority}"><div class="task-body"><button type="button" class="task-name" data-edit="${escapeHtml(t.id)}">${escapeHtml(t.title)}</button><div class="task-meta"><span class="category-name" style="${categoryStyle(t.category_id)}">${escapeHtml(categoryName(t.category_id))}</span><span>중요도 ${priorityName[t.priority]}</span><span>시작 ${escapeHtml(taskDateLabel(t, 'start'))}</span><span>마감 ${escapeHtml(taskDateLabel(t, 'due'))}</span>${t.yearly_repeat ? '<span>매년 반복</span>' : ''}${isOverdue(t) ? '<span>기한 초과</span>' : ''}</div></div><div class="task-actions"><button type="button" class="complete-btn" data-toggle="${escapeHtml(t.id)}" aria-label="${escapeHtml(t.title)} ${t.completed ? '되돌리기' : '완료'}">${t.completed ? '되돌리기' : '완료'}</button>${t.completed ? `<button type="button" class="delete-completed" data-delete="${escapeHtml(t.id)}">삭제</button>` : ''}</div></article>`;
   const active = items.filter(t => !t.completed), done = items.filter(t => t.completed);
   $('taskList').innerHTML = (active.length ? active.map(taskCard).join('') : '<div class="empty">진행 중인 일정이 없습니다.</div>') + (done.length ? `<div class="completed-section"><h3>완료한 일정</h3>${done.map(taskCard).join('')}</div>` : '');
 }
-['search', 'statusFilter', 'categoryFilter', 'sort'].forEach(id => $(id).addEventListener('input', () => {renderTasks();preferences.patch({[id]:$(id).value});}));
-$('sourceFilter').addEventListener('change',()=>preferences.patch({sourceFilter:$('sourceFilter').value,sort:$('sort').value}));
+['search', 'statusFilter', 'categoryFilter', 'sort'].forEach(id => $(id).addEventListener('input', () => {renderTasks();if(id==='sort')renderCalendar();preferences.patch({[id]:$(id).value});}));
+$('sourceFilter').addEventListener('change',()=>{renderCalendar();preferences.patch({sourceFilter:$('sourceFilter').value,sort:$('sort').value});});
 $('taskList').addEventListener('click', e => { const button = e.target.closest('[data-edit]'); if (button) openTask(button.dataset.edit); });
 $('taskList').addEventListener('click', async e => { const button = e.target.closest('[data-toggle]'); if (button) await toggleTask(button.dataset.toggle, button); });
 async function toggleTask(id, button) {
@@ -270,11 +261,11 @@ function renderCalendar() {
   $('retryHolidays').hidden = !statuses.some(s => s?.error);
   $('calendarGrid').innerHTML = Array.from({ length: days }, (_, i) => {
     const date = new Date(year, month, i + 1 - offset); const key = localDate(date);
-    const matches = state.tasks.filter(t => taskOnDay(t, key)).sort((a, b) => Number(a.completed) - Number(b.completed));
+    const matches = state.tasks.filter(t => taskOnDay(t, key)).sort((a,b)=>compareTasks(a,b,$('sort').value,state.categories));
     const holiday = holidayNames(key);
     return `<button type="button" class="day ${holiday || date.getDay() === 0 ? 'sunday' : date.getDay() === 6 ? 'saturday' : ''} ${date.getMonth() !== month ? 'other' : ''} ${key === today ? 'today' : ''} ${key === state.selected ? 'selected' : ''}" data-date="${key}" aria-label="${key}${holiday ? ' ' + escapeHtml(holiday) : ''}, 일정 ${matches.length}건"><span class="day-number">${date.getDate()}</span><span class="day-items">${holiday ? `<span class="holiday-name">${escapeHtml(holiday)}</span>` : ''}${matches.slice(0, 2).map(t => `<span class="calendar-task ${t.priority} ${t.completed ? 'done' : ''}" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>`).join('')}${matches.length > 2 ? `<span class="more-count">+${matches.length - 2}건</span>` : ''}</span></button>`;
   }).join('');
-  const matches = state.tasks.filter(t => taskOnDay(t, state.selected)).sort((a, b) => Number(a.completed) - Number(b.completed));
+  const matches = state.tasks.filter(t => taskOnDay(t, state.selected)).sort((a,b)=>compareTasks(a,b,$('sort').value,state.categories));
   $('agendaDate').textContent = new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).format(parseLocal(state.selected));
   $('agendaList').innerHTML = matches.length ? matches.map(t => `<div class="agenda-item"><div class="agenda-item-heading"><button type="button" data-edit="${escapeHtml(t.id)}">${t.completed ? '✓ ' : ''}${escapeHtml(t.title)}</button><button class="agenda-share" type="button" data-share="${escapeHtml(t.id)}" aria-label="일정 공유 텍스트 복사">공유 복사</button></div><small><span class="category-name" style="${categoryStyle(t.category_id)}">${escapeHtml(categoryName(t.category_id))}</span> · <span class="agenda-priority ${['high', 'medium', 'low'].includes(t.priority) ? t.priority : 'medium'}">중요도 ${priorityName[t.priority] || '보통'}</span>${t.completed ? ' · 완료' : ''}${t.yearly_repeat ? ' · 매년 반복' : ''}</small>${dateTimeLabel(t, state.selected) ? `<small>${escapeHtml(dateTimeLabel(t, state.selected))}</small>` : ''}${t.note ? `<p class="agenda-note">${escapeHtml(t.note)}</p>` : ''}</div>`).join('') : '<p class="muted">이 날짜의 일정이 없습니다.</p>';
 }
@@ -302,7 +293,7 @@ $('addOnDate').onclick = () => openTask(null, state.selected);
 
 function prepareTask(id = null, dueDate = '') {
   const t = state.tasks.find(item => item.id === id); state.editId = t?.id || null; attachments.load(state.editId);
-  $('taskForm').reset(); $('dialogTitle').textContent = t ? '일정 수정' : '새 일정 입력'; $('deleteTask').hidden = !t; $('taskError').textContent = '';
+  $('taskForm').reset(); $('dialogTitle').textContent = t ? '일정 수정' : '새 일정 입력'; $('deleteTask').hidden = !t; $('completeTask').hidden = !t; $('completeTask').textContent = t?.completed ? '되돌리기' : '완료'; $('taskError').textContent = '';
   $('taskStartTime').value = t?.start_time?.slice(0,5) || ''; $('taskDueTime').value = t?.due_time?.slice(0,5) || '';
   $('taskTitle').value = t?.title || ''; $('taskNote').value = t?.note || ''; $('taskCategory').value = t?.category_id || state.categories[0]?.id || '';
   $('taskPriority').value = t?.priority || 'medium'; $('taskLunar').checked = !!t?.is_lunar; $('taskYearly').checked = !!t?.yearly_repeat; $('taskLeap').checked = !!t?.lunar_leap; syncDateLimits(); const dates = t ? taskDates(t) : {}; $('taskStart').value = dates.start || ''; $('taskDue').value = dates.due || dueDate; syncDateLimits();
@@ -331,20 +322,30 @@ $('shareTask').onclick=async()=>{
   catch(error){$('taskError').textContent=errorText(error);}
 };
 $('cancelDialog').onclick = () => { prepareTask(); switchView('list'); };
-$('taskForm').onsubmit = async event => {
+async function submitTask(event, toggling=false) {
   event.preventDefault(); if (state.loading) return;
   let values;
   try { values={user_id:state.user.id,...readTaskForm(),attachments:attachments.read(),updated_at:new Date().toISOString()}; } catch(error) { $('taskError').textContent=error.message; return; }
   if (!values.title || !values.category_id) { $('taskError').textContent = '제목과 일정 분야를 확인하세요.'; return; }
+  if(toggling){
+    const task=state.tasks.find(t=>t.id===state.editId);
+    if(!task)return;
+    values.completed=!task.completed;
+  }
   busy(true);
   try {
     if (state.editId) checked(await db.from('todo_tasks').update(values).eq('id', state.editId).eq('user_id', state.user.id).select('id').single());
     else checked(await db.from('todo_tasks').insert(values).select('id').single());
-    await loadData(); prepareTask(); switchView('list'); showNotice('일정을 저장했습니다.');
+    await loadData(); prepareTask(); switchView('list'); showNotice(toggling ? (values.completed ? '일정을 완료했습니다.' : '일정을 진행 중으로 되돌렸습니다.') : '일정을 저장했습니다.');
   } catch (error) { $('taskError').textContent = errorText(error); }
   finally { busy(false); }
+}
+$('taskForm').onsubmit = event => submitTask(event);
+$('completeTask').onclick = event => {
+  if($('taskForm').reportValidity())return submitTask(event,true);
 };
 $('deleteTask').onclick = async () => {
+  if(state.loading)return;
   const t = state.tasks.find(item => item.id === state.editId); if (!t || !confirm(`“${t.title}” 일정을 삭제할까요?`)) return;
   busy(true); try { checked(await db.from('todo_tasks').delete().eq('id', t.id).eq('user_id', state.user.id).select('id').single()); await loadData(); prepareTask(); switchView('list'); showNotice('일정을 삭제했습니다.'); }
   catch (error) { $('taskError').textContent = errorText(error); } finally { busy(false); }

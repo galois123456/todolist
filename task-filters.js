@@ -15,3 +15,17 @@ export function compareCategories(a,b,categories){
  const order=id=>{const n=categories.findIndex(c=>c.id===id);return n<0?categories.length:n;};
  return order(a.category_id)-order(b.category_id)||(a.due_date||'9999').localeCompare(b.due_date||'9999')||a.title.localeCompare(b.title,'ko');
 }
+
+// Every schedule view keeps completed items last, then uses the selected list order.
+export function compareTasks(a,b,sort='due',categories=[]){
+ const completed=Number(!!a.completed)-Number(!!b.completed);
+ if(completed)return completed;
+ const rank={high:0,medium:1,low:2};
+ const due=()=>(a.due_date||'9999').localeCompare(b.due_date||'9999');
+ if(sort==='priority')return rank[a.priority]-rank[b.priority]||due();
+ if(sort==='start')return (a.start_date||'9999').localeCompare(b.start_date||'9999');
+ if(sort==='new')return (b.created_at||'').localeCompare(a.created_at||'');
+ if(sort==='title')return a.title.localeCompare(b.title,'ko');
+ if(sort==='category')return compareCategories(a,b,categories);
+ return due()||rank[a.priority]-rank[b.priority];
+}
