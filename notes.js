@@ -1,3 +1,4 @@
+import { normalizeNoteFormat, applyNoteFormat, noteFontSizes, noteSaveError } from './note-format.js';
 import { createAutoSaver } from './note-autosave.js';
 
 import { appColors } from './app-colors.js';
@@ -9,11 +10,22 @@ export function createNotes({ db, getUser }) {
   const retry = document.getElementById('retryNotes');
   let owner = null, loaded = false, loading = false, generation = 0;
   const records = new Map();
+  const expanded=document.createElement('dialog');expanded.className='note-expanded';expanded.setAttribute('aria-label','메모 크게 보기');document.body.append(expanded);
+  let expandedCard=null;
+  function closeExpanded(){
+    if(!expandedCard)return;
+    const {element,placeholder,button}=expandedCard;expandedCard=null;
+    placeholder.replaceWith(element);button.textContent='확대';button.setAttribute('aria-label','메모 크게 보기');
+    if(expanded.open)expanded.close();button.focus({preventScroll:true});
+  }
+  expanded.addEventListener('close',()=>{if(!expanded.open)closeExpanded();});
+  expanded.addEventListener('cancel',event=>{event.preventDefault();closeExpanded();});
+
   const checked = result => { if (result.error) throw result.error; return result.data; };
   const draftKey = id => `school-todo-note-draft-${owner}-${id}`;
   function cache(key, value) { try { if (value) localStorage.setItem(key, JSON.stringify(value)); else localStorage.removeItem(key); } catch {} }
   function reset() {
-    generation++; records.forEach(r => r.saver.dispose()); records.clear();
+    closeExpanded(); generation++; records.forEach(r => r.saver.dispose()); records.clear();
     grid.replaceChildren(); owner = null; loaded = false; loading = false; add.disabled = false;
   }
   function emptyMessage() { message.textContent = records.size ? '' : '새 메모장을 눌러 첫 메모를 만들어 보세요.'; }
@@ -23,18 +35,36 @@ export function createNotes({ db, getUser }) {
     try { draft = JSON.parse(localStorage.getItem(key)); } catch {}
     if (draft && typeof draft.body === 'string' && draft.body.length <= 20000 && paperColors.some(([c]) => c === draft.color)) Object.assign(note, draft);
     else draft = null;
+    let format=normalizeNoteFormat(note.text_style);
     const element = document.createElement('article'); element.className = `sticky-note paper-${note.color}`;
-    element.innerHTML = '<div class="sticky-top"><span class="note-status" role="status"></span><div class="note-tools"><details class="paper-picker"><summary aria-label="포스트잇 종이 색상 변경">색상 ▾</summary><div class="paper-palette"></div></details><button type="button" class="remove-note" aria-label="메모 삭제">삭제</button></div></div><textarea class="note-body" maxlength="20000" placeholder="여기에 메모하세요…" aria-label="메모 내용"></textarea><div class="sticky-bottom"><small class="note-date"></small><button class="note-retry" type="button" hidden>저장 재시도</button></div>';
+    element.innerHTML = '<div class="sticky-top"><span class="note-status" role="status"></span><div class="note-tools"><details class="paper-picker"><summary aria-label="포스트잇 종이 색상 변경">색상 ▾</summary><div class="paper-palette"></div></details><details class="paper-picker note-format-picker"><summary aria-label="메모 글자 서식">서식 ▾</summary><div class="note-format-panel"><label>글자 크기<select class="note-font-size" aria-label="글자 크기"></select></label><div class="note-style-buttons"><button type="button" class="note-bold" aria-pressed="false">굵게</button><button type="button" class="note-underline" aria-pressed="false">밑줄</button></div><label>글자색<input class="note-text-color" type="color" aria-label="메모 글자색"></label><button type="button" class="note-format-reset">서식 초기화</button><small>이 메모 전체에 적용</small></div></details><button type="button" class="expand-note" aria-label="메모 크게 보기">확대</button><button type="button" class="remove-note" aria-label="메모 삭제">삭제</button></div></div><textarea class="note-body" maxlength="20000" placeholder="여기에 메모하세요…" aria-label="메모 내용"></textarea><p class="note-save-error" role="alert" hidden></p><div class="sticky-bottom"><small class="note-date"></small><button class="note-retry" type="button" hidden>저장 재시도</button></div>';
     const input = element.querySelector('textarea'), status = element.querySelector('.note-status'), retrySave = element.querySelector('.note-retry');
-    input.value = note.body; status.textContent = '저장됨';
+    input.value = note.body; status.textContent = '저장됨'; applyNoteFormat(input,format);
     element.querySelector('.note-date').textContent = new Intl.DateTimeFormat('ko-KR',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(note.created_at));
     const saver = createAutoSaver({
-      snapshot: () => ({ body: input.value, color: note.color }),
+      snapshot: () => ({ body: input.value, color: note.color, text_style: {...format} }),
       persist: async values => { checked(await db.from('todo_notes').update({ ...values, updated_at: new Date().toISOString() }).eq('id', note.id).eq('user_id', userId).select('id').single()); },
-      status: (state, error) => { status.textContent = { pending:'저장 대기',saving:'저장 중…',saved:'저장됨',error:'저장 실패' }[state]; retrySave.hidden = state !== 'error'; status.title = error?.message || ''; },
+      status: (state, error) => { status.textContent = { pending:'저장 대기',saving:'저장 중…',saved:'저장됨',error:'저장 실패' }[state]; retrySave.hidden = state !== 'error'; status.title = error ? noteSaveError(error) : ''; const errorBox=element.querySelector('.note-save-error');errorBox.hidden=state!=='error';errorBox.textContent=state==='error'?noteSaveError(error):''; },
       remember: values => cache(key, values), forget: () => cache(key, null)
     });
     records.set(note.id,{ saver, element });
+    const size=element.querySelector('.note-font-size'),bold=element.querySelector('.note-bold'),underline=element.querySelector('.note-underline'),ink=element.querySelector('.note-text-color');
+    noteFontSizes.forEach(value=>{const option=document.createElement('option');option.value=String(value);option.textContent=value+'px';size.append(option);});
+    function refreshFormat(){applyNoteFormat(input,format);size.value=String(format.fontSize);bold.setAttribute('aria-pressed',String(format.bold));underline.setAttribute('aria-pressed',String(format.underline));ink.value=format.textColor;}
+    function changeFormat(patch){format=normalizeNoteFormat({...format,...patch});refreshFormat();saver.changed();}
+    size.onchange=()=>changeFormat({fontSize:Number(size.value)});
+    bold.onclick=()=>changeFormat({bold:!format.bold});underline.onclick=()=>changeFormat({underline:!format.underline});
+    ink.oninput=()=>changeFormat({textColor:ink.value});
+    element.querySelector('.note-format-reset').onclick=()=>{format=normalizeNoteFormat();refreshFormat();saver.changed();};refreshFormat();
+    const expandButton=element.querySelector('.expand-note');
+    expandButton.onclick=()=>{
+      if(expandedCard?.element===element){closeExpanded();return;}
+      closeExpanded();element.querySelectorAll('details').forEach(d=>d.open=false);
+      const placeholder=document.createComment('expanded note');element.replaceWith(placeholder);
+      expandedCard={element,placeholder,button:expandButton};expanded.append(element);
+      expandButton.textContent='닫기';expandButton.setAttribute('aria-label','메모 크게 보기 닫기');expanded.showModal();input.focus({preventScroll:true});
+    };
+
     input.addEventListener('input', saver.changed);
     input.addEventListener('blur', saver.flush);
     retrySave.onclick = saver.flush;
@@ -47,13 +77,13 @@ export function createNotes({ db, getUser }) {
     element.querySelector('.remove-note').onclick = async event => {
       if (!confirm('이 메모를 삭제할까요?')) return;
       const button = event.currentTarget; button.disabled = true; input.disabled = true;
-      element.querySelector('details').open = false;
-      palette.querySelectorAll('button').forEach(b => b.disabled = true);
+      element.querySelectorAll('details').forEach(d=>d.open=false);
+      element.querySelectorAll('button,select,input').forEach(control=>control.disabled=true);
       await saver.flush();
       try {
         checked(await db.from('todo_notes').delete().eq('id',note.id).eq('user_id',userId).select('id').single());
-        saver.dispose(); cache(key,null); records.delete(note.id); element.remove(); emptyMessage();
-      } catch (error) { message.textContent = `메모 삭제 실패: ${error.message}`; button.disabled = false; input.disabled = false; palette.querySelectorAll('button').forEach(b => b.disabled = false); }
+        if(expandedCard?.element===element)closeExpanded();saver.dispose(); cache(key,null); records.delete(note.id); element.remove(); emptyMessage();
+      } catch (error) { message.textContent = `메모 삭제 실패: ${error.message}`; button.disabled = false; input.disabled = false; element.querySelectorAll('button,select,input').forEach(control=>control.disabled=false); }
     };
     if (prepend) grid.prepend(element); else grid.append(element);
     if (draft) saver.changed();
