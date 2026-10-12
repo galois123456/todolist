@@ -87,3 +87,13 @@
 @media(max-width:760px){.note-tools .expand-note{display:inline-flex}.note-expanded .expand-note{display:inline-flex}.note-tools button,.note-tools summary{min-height:40px}}
 
 @media(max-width:760px){.note-expanded{padding:8px;padding-top:max(8px,env(safe-area-inset-top));padding-bottom:max(8px,env(safe-area-inset-bottom))}.note-expanded .sticky-note{padding:12px;height:100%;min-height:0;aspect-ratio:auto;border-radius:12px}.note-expanded .sticky-top{margin-bottom:8px}.note-expanded .note-tools{gap:4px}.note-expanded .note-tools button,.note-expanded .note-tools summary{font-size:12px;padding:6px 9px;min-height:40px}.note-expanded .note-body{width:100%;flex:1;min-height:0;overflow-y:auto;font-size:16px}}
+
+/* Align all three toolbar labels identically, including native summary and flex buttons. */
+.note-tools > .paper-picker{flex:0 0 auto;margin:0;padding:0}
+.note-tools > button,.note-tools > .paper-picker > summary{
+ display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;
+ line-height:1.2;text-align:center;vertical-align:middle;margin:0;flex-shrink:0;
+ height:34px;min-height:34px;
+}
+.note-expanded .note-tools > button,.note-expanded .note-tools > .paper-picker > summary{height:40px;min-height:40px}
+@media(max-width:760px){.note-tools > button,.note-tools > .paper-picker > summary{height:40px;min-height:40px}}
