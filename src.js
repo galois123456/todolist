@@ -277,6 +277,14 @@ $('calendarGrid').onclick = e => {
   const cell = e.target.closest('[data-date]'); if (!cell) return;
   const repeat = lastCalendarTap === cell.dataset.date && state.selected === cell.dataset.date;
   lastCalendarTap = cell.dataset.date; state.selected = cell.dataset.date;
+  if(desktopLayout.matches && !state.editId && !state.loading){
+    if($('taskLunar').checked){
+      showNotice('음력 입력 중에는 마감일을 직접 입력하세요. 캘린더는 양력 날짜입니다.');
+    }else{
+      $('taskDue').value=state.selected;
+      syncDateLimits();
+    }
+  }
   state.month = new Date(parseLocal(state.selected).getFullYear(), parseLocal(state.selected).getMonth(), 1); renderCalendar();
   if (repeat) $('agendaPanel').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
 };
