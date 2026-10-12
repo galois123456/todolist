@@ -1,4 +1,3 @@
-import { normalizeNoteFormat, applyNoteFormat, noteFontSizes, noteSaveError } from './note-format.js';
 import { createAutoSaver } from './note-autosave.js';
 
 import { appColors } from './app-colors.js';
@@ -21,6 +20,7 @@ export function createNotes({ db, getUser }) {
   expanded.addEventListener('close',()=>{if(!expanded.open)closeExpanded();});
   expanded.addEventListener('cancel',event=>{event.preventDefault();closeExpanded();});
 
+  const noteSaveError=error=>error?.code==='23514'?'메모 색상 저장 설정을 업데이트해야 합니다. Supabase에서 migrate-ver1.36.sql을 실행한 뒤 저장 재시도를 누르세요.':error?.message||'인터넷 연결을 확인한 뒤 다시 시도하세요.';
   const checked = result => { if (result.error) throw result.error; return result.data; };
   const draftKey = id => `school-todo-note-draft-${owner}-${id}`;
   function cache(key, value) { try { if (value) localStorage.setItem(key, JSON.stringify(value)); else localStorage.removeItem(key); } catch {} }
@@ -35,27 +35,18 @@ export function createNotes({ db, getUser }) {
     try { draft = JSON.parse(localStorage.getItem(key)); } catch {}
     if (draft && typeof draft.body === 'string' && draft.body.length <= 20000 && paperColors.some(([c]) => c === draft.color)) Object.assign(note, draft);
     else draft = null;
-    let format=normalizeNoteFormat(note.text_style);
     const element = document.createElement('article'); element.className = `sticky-note paper-${note.color}`;
-    element.innerHTML = '<div class="sticky-top"><span class="note-status" role="status"></span><div class="note-tools"><details class="paper-picker"><summary aria-label="포스트잇 종이 색상 변경">색상 ▾</summary><div class="paper-palette"></div></details><details class="paper-picker note-format-picker"><summary aria-label="메모 글자 서식">서식 ▾</summary><div class="note-format-panel"><label>글자 크기<select class="note-font-size" aria-label="글자 크기"></select></label><div class="note-style-buttons"><button type="button" class="note-bold" aria-pressed="false">굵게</button><button type="button" class="note-underline" aria-pressed="false">밑줄</button></div><label>글자색<input class="note-text-color" type="color" aria-label="메모 글자색"></label><button type="button" class="note-format-reset">서식 초기화</button><small>이 메모 전체에 적용</small></div></details><button type="button" class="expand-note" aria-label="메모 크게 보기">확대</button><button type="button" class="remove-note" aria-label="메모 삭제">삭제</button></div></div><textarea class="note-body" maxlength="20000" placeholder="여기에 메모하세요…" aria-label="메모 내용"></textarea><p class="note-save-error" role="alert" hidden></p><div class="sticky-bottom"><small class="note-date"></small><button class="note-retry" type="button" hidden>저장 재시도</button></div>';
+    element.innerHTML = '<div class="sticky-top"><span class="note-status" role="status"></span><div class="note-tools"><details class="paper-picker"><summary aria-label="포스트잇 종이 색상 변경">색상 ▾</summary><div class="paper-palette"></div></details><button type="button" class="expand-note" aria-label="메모 크게 보기">확대</button><button type="button" class="remove-note" aria-label="메모 삭제">삭제</button></div></div><textarea class="note-body" maxlength="20000" placeholder="여기에 메모하세요…" aria-label="메모 내용"></textarea><p class="note-save-error" role="alert" hidden></p><div class="sticky-bottom"><small class="note-date"></small><button class="note-retry" type="button" hidden>저장 재시도</button></div>';
     const input = element.querySelector('textarea'), status = element.querySelector('.note-status'), retrySave = element.querySelector('.note-retry');
-    input.value = note.body; status.textContent = '저장됨'; applyNoteFormat(input,format);
+    input.value = note.body; status.textContent = '저장됨';
     element.querySelector('.note-date').textContent = new Intl.DateTimeFormat('ko-KR',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(note.created_at));
     const saver = createAutoSaver({
-      snapshot: () => ({ body: input.value, color: note.color, text_style: {...format} }),
+      snapshot: () => ({ body: input.value, color: note.color }),
       persist: async values => { checked(await db.from('todo_notes').update({ ...values, updated_at: new Date().toISOString() }).eq('id', note.id).eq('user_id', userId).select('id').single()); },
       status: (state, error) => { status.textContent = { pending:'저장 대기',saving:'저장 중…',saved:'저장됨',error:'저장 실패' }[state]; retrySave.hidden = state !== 'error'; status.title = error ? noteSaveError(error) : ''; const errorBox=element.querySelector('.note-save-error');errorBox.hidden=state!=='error';errorBox.textContent=state==='error'?noteSaveError(error):''; },
       remember: values => cache(key, values), forget: () => cache(key, null)
     });
     records.set(note.id,{ saver, element });
-    const size=element.querySelector('.note-font-size'),bold=element.querySelector('.note-bold'),underline=element.querySelector('.note-underline'),ink=element.querySelector('.note-text-color');
-    noteFontSizes.forEach(value=>{const option=document.createElement('option');option.value=String(value);option.textContent=value+'px';size.append(option);});
-    function refreshFormat(){applyNoteFormat(input,format);size.value=String(format.fontSize);bold.setAttribute('aria-pressed',String(format.bold));underline.setAttribute('aria-pressed',String(format.underline));ink.value=format.textColor;}
-    function changeFormat(patch){format=normalizeNoteFormat({...format,...patch});refreshFormat();saver.changed();}
-    size.onchange=()=>changeFormat({fontSize:Number(size.value)});
-    bold.onclick=()=>changeFormat({bold:!format.bold});underline.onclick=()=>changeFormat({underline:!format.underline});
-    ink.oninput=()=>changeFormat({textColor:ink.value});
-    element.querySelector('.note-format-reset').onclick=()=>{format=normalizeNoteFormat();refreshFormat();saver.changed();};refreshFormat();
     const expandButton=element.querySelector('.expand-note');
     expandButton.onclick=()=>{
       if(expandedCard?.element===element){closeExpanded();return;}

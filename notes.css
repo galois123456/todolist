@@ -80,11 +80,10 @@
 .sticky-note.paper-black .note-body::placeholder{color:#64748b}
 .sticky-note.paper-black .paper-picker summary{color:#334155;background:#ffffff5c}
 .sticky-note.paper-black .note-retry,.sticky-note.paper-black .remove-note{color:#b91c1c;background:#ffffff5c}
-/* 메모 전체에 적용하는 서식 메뉴, 본문과 동일한 편집기를 확대합니다. */
 .sticky-top{flex-wrap:wrap}.note-tools{gap:4px;flex-wrap:wrap}.note-tools button,.note-tools summary{padding:6px 7px;font-size:12px}
-.note-format-panel{position:absolute;z-index:15;right:0;top:calc(100% + 4px);width:220px;max-width:calc(100vw - 44px);padding:12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#27272a;box-shadow:0 8px 22px #0003;display:grid;gap:10px}
-.note-format-panel label{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px}.note-format-panel select{width:95px;min-height:36px;background:#fff;color:#27272a;border:1px solid #cbd5e1;border-radius:6px}.note-format-panel input[type=color]{width:55px;height:36px;padding:2px;border:1px solid #cbd5e1;border-radius:6px}.note-style-buttons{display:flex;gap:8px}.note-style-buttons button{flex:1}.note-style-buttons button[aria-pressed=true]{background:#dbeafe;border-color:#2563eb;color:#1d4ed8}.note-format-panel small{font-size:11px;color:#64748b}.note-bold{font-weight:800!important}.note-underline{text-decoration:underline}
 .note-save-error{font-size:12px;line-height:1.4;color:#b91c1c;margin:5px 0;overflow-wrap:anywhere;flex-shrink:0}
 .note-expanded{width:100vw;max-width:none;height:100dvh;max-height:none;margin:0;border:0;border-radius:0;padding:16px;background:var(--bg);overflow:hidden}
 .note-expanded::backdrop{background:#0008}.note-expanded .sticky-note{height:100%;width:100%;aspect-ratio:auto;min-height:0;border-radius:16px;padding:22px 28px;box-sizing:border-box}.note-expanded .sticky-top{margin-bottom:16px}.note-expanded .note-body{flex:1;min-height:0}.note-expanded .note-tools button,.note-expanded .note-tools summary{min-height:40px;padding:8px 12px;font-size:14px}
-@media(max-width:760px){.note-tools .expand-note{display:none}.note-expanded .expand-note{display:inline-flex}.note-format-panel{right:-40px}.note-tools button,.note-tools summary{min-height:40px}}
+@media(max-width:760px){.note-tools .expand-note{display:inline-flex}.note-expanded .expand-note{display:inline-flex}.note-tools button,.note-tools summary{min-height:40px}}
+
+@media(max-width:760px){.note-expanded{padding:8px;padding-top:max(8px,env(safe-area-inset-top));padding-bottom:max(8px,env(safe-area-inset-bottom))}.note-expanded .sticky-note{padding:12px;height:100%;min-height:0;aspect-ratio:auto;border-radius:12px}.note-expanded .sticky-top{margin-bottom:8px}.note-expanded .note-tools{gap:4px}.note-expanded .note-tools button,.note-expanded .note-tools summary{font-size:12px;padding:6px 9px;min-height:40px}.note-expanded .note-body{width:100%;flex:1;min-height:0;overflow-y:auto;font-size:16px}}
