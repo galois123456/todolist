@@ -1,22 +1,22 @@
 {
-  "name": "personal-school-todo",
+  "name": "school-record-cloud",
+  "version": "3.0.17",
   "private": true,
-  "version": "1.38.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0",
-    "check": "node --check src.js",
-    "test": "node --test tests/*.test.js"
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/dev.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check src/main.js && node --check src/sync.js && node --check src/remote.js && node --check scripts/build.mjs && node --check scripts/editor-transform.mjs"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.0.0",
-    "fast-xml-parser": "^5.11.2",
-    "heic-to": "1.6.5",
-    "korean-lunar-calendar": "^0.3.6"
+    "@supabase/supabase-js": "2.102.0"
   },
   "devDependencies": {
-    "vite": "^7.0.0"
+    "@electric-sql/pglite": "0.3.14",
+    "esbuild": "0.25.12"
   }
 }
