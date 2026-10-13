@@ -242,3 +242,7 @@ alter table public.todo_notes add constraint todo_notes_text_style_check
  check (jsonb_typeof(text_style) = 'object' and octet_length(text_style::text) <= 1024);
 commit;
 notify pgrst, 'reload schema';
+
+-- 메모 숨김 상태 저장: 기존 메모는 모두 일반 메모함으로 유지됩니다.
+alter table public.todo_notes add column if not exists is_hidden boolean not null default false;
+notify pgrst, 'reload schema';

@@ -97,3 +97,7 @@
 }
 .note-expanded .note-tools > button,.note-expanded .note-tools > .paper-picker > summary{height:40px;min-height:40px}
 @media(max-width:760px){.note-tools > button,.note-tools > .paper-picker > summary{height:40px;min-height:40px}}
+
+.notes-toolbar{justify-content:flex-start}
+.note-tools{flex-wrap:nowrap}
+@media(max-width:760px){.note-tools{gap:4px}.note-tools > button,.note-tools > .paper-picker > summary{padding-left:6px;padding-right:6px}}

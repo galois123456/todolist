@@ -7,6 +7,9 @@ export function createNotes({ db, getUser }) {
   const message = document.getElementById('notesMessage');
   const add = document.getElementById('newNote');
   const retry = document.getElementById('retryNotes');
+  const toggle = document.getElementById('toggleHiddenNotes');
+  const title = document.getElementById('notesTitle');
+  let showHidden = false;
   let owner = null, loaded = false, loading = false, generation = 0;
   const records = new Map();
   const expanded=document.createElement('dialog');expanded.className='note-expanded';expanded.setAttribute('aria-label','메모 크게 보기');document.body.append(expanded);
@@ -26,17 +29,28 @@ export function createNotes({ db, getUser }) {
   function cache(key, value) { try { if (value) localStorage.setItem(key, JSON.stringify(value)); else localStorage.removeItem(key); } catch {} }
   function reset() {
     closeExpanded(); generation++; records.forEach(r => r.saver.dispose()); records.clear();
-    grid.replaceChildren(); owner = null; loaded = false; loading = false; add.disabled = false;
+    showHidden = false; grid.replaceChildren(); updateView(); owner = null; loaded = false; loading = false; add.disabled = false;
   }
-  function emptyMessage() { message.textContent = records.size ? '' : '새 메모장을 눌러 첫 메모를 만들어 보세요.'; }
+  function emptyMessage() {
+    const count=[...records.values()].filter(r=>Boolean(r.note.is_hidden)===showHidden).length;
+    message.textContent=count?'':showHidden?'숨김 메모가 없습니다.':'새 메모장을 눌러 메모를 만들어 보세요.';
+  }
+  function updateView(){
+    toggle.textContent=showHidden?'일반 메모함':'숨김 메모함';
+    toggle.setAttribute('aria-pressed',String(showHidden));
+    title.textContent=showHidden?'숨김 메모함':'나의 메모장';
+    records.forEach(r=>{r.element.hidden=Boolean(r.note.is_hidden)!==showHidden;});
+    emptyMessage();
+  }
+  toggle.onclick=()=>{closeExpanded();showHidden=!showHidden;updateView();};
   function card(note, prepend = false) {
     const userId = owner, key = draftKey(note.id);
     let draft;
     try { draft = JSON.parse(localStorage.getItem(key)); } catch {}
-    if (draft && typeof draft.body === 'string' && draft.body.length <= 20000 && paperColors.some(([c]) => c === draft.color)) Object.assign(note, draft);
+    if (draft && typeof draft.body === 'string' && draft.body.length <= 20000 && paperColors.some(([c]) => c === draft.color)) Object.assign(note, {body:draft.body,color:draft.color});
     else draft = null;
     const element = document.createElement('article'); element.className = `sticky-note paper-${note.color}`;
-    element.innerHTML = '<div class="sticky-top"><span class="note-status" role="status"></span><div class="note-tools"><details class="paper-picker"><summary aria-label="포스트잇 종이 색상 변경">색상 ▾</summary><div class="paper-palette"></div></details><button type="button" class="expand-note" aria-label="메모 크게 보기">확대</button><button type="button" class="remove-note" aria-label="메모 삭제">삭제</button></div></div><textarea class="note-body" maxlength="20000" placeholder="여기에 메모하세요…" aria-label="메모 내용"></textarea><p class="note-save-error" role="alert" hidden></p><div class="sticky-bottom"><small class="note-date"></small><button class="note-retry" type="button" hidden>저장 재시도</button></div>';
+    element.innerHTML = '<div class="sticky-top"><span class="note-status" role="status"></span><div class="note-tools"><details class="paper-picker"><summary aria-label="포스트잇 종이 색상 변경">색상 ▾</summary><div class="paper-palette"></div></details><button type="button" class="expand-note" aria-label="메모 크게 보기">확대</button><button type="button" class="hide-note">숨김</button><button type="button" class="remove-note" aria-label="메모 삭제">삭제</button></div></div><textarea class="note-body" maxlength="20000" placeholder="여기에 메모하세요…" aria-label="메모 내용"></textarea><p class="note-save-error" role="alert" hidden></p><div class="sticky-bottom"><small class="note-date"></small><button class="note-retry" type="button" hidden>저장 재시도</button></div>';
     const input = element.querySelector('textarea'), status = element.querySelector('.note-status'), retrySave = element.querySelector('.note-retry');
     input.value = note.body; status.textContent = '저장됨';
     element.querySelector('.note-date').textContent = new Intl.DateTimeFormat('ko-KR',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(note.created_at));
@@ -46,7 +60,23 @@ export function createNotes({ db, getUser }) {
       status: (state, error) => { status.textContent = { pending:'저장 대기',saving:'저장 중…',saved:'저장됨',error:'저장 실패' }[state]; retrySave.hidden = state !== 'error'; status.title = error ? noteSaveError(error) : ''; const errorBox=element.querySelector('.note-save-error');errorBox.hidden=state!=='error';errorBox.textContent=state==='error'?noteSaveError(error):''; },
       remember: values => cache(key, values), forget: () => cache(key, null)
     });
-    records.set(note.id,{ saver, element });
+    records.set(note.id,{ saver, element, note });
+    element.hidden=Boolean(note.is_hidden)!==showHidden;
+    const hideButton=element.querySelector('.hide-note');
+    hideButton.textContent=note.is_hidden?'보이기':'숨김';
+    hideButton.onclick=async()=>{
+      const token=generation, next=!Boolean(note.is_hidden);
+      hideButton.disabled=true;
+      element.querySelector('.remove-note').disabled=true;
+      try{
+        checked(await db.from('todo_notes').update({is_hidden:next,updated_at:new Date().toISOString()}).eq('id',note.id).eq('user_id',userId).select('id').single());
+        if(token!==generation)return;
+        if(expandedCard?.element===element)closeExpanded();
+        note.is_hidden=next;hideButton.textContent=next?'보이기':'숨김';updateView();
+      }catch(error){
+        if(token===generation)message.textContent=`메모 이동 실패: ${['42703','PGRST204'].includes(error.code)?'Supabase에서 migrate-ver1.38.sql을 먼저 실행하세요.':error.message}`;
+      }finally{if(token===generation){hideButton.disabled=false;element.querySelector('.remove-note').disabled=false;}}
+    };
     const expandButton=element.querySelector('.expand-note');
     expandButton.onclick=()=>{
       if(expandedCard?.element===element){closeExpanded();return;}
@@ -88,7 +118,7 @@ export function createNotes({ db, getUser }) {
     try {
       const notes = checked(await db.from('todo_notes').select('*').eq('user_id',owner).order('created_at',{ascending:false}).order('id',{ascending:false}));
       if (token !== generation) return;
-      notes.forEach(note => card(note)); loaded = true; emptyMessage();
+      notes.forEach(note => card(note)); loaded = true; updateView();
     } catch (error) { if (token === generation) { message.textContent = `메모를 불러오지 못했습니다. ${error.message} · 처음 사용하는 경우 ver1.10 SQL을 실행하세요.`; retry.hidden = false; } }
     finally { if (token === generation) { loading = false; add.disabled = !loaded; } }
   }
@@ -98,7 +128,7 @@ export function createNotes({ db, getUser }) {
     try {
       const note = checked(await db.from('todo_notes').insert({user_id:owner,body:'',color:'yellow'}).select().single());
       if (token !== generation) return;
-      const input = card(note,true); emptyMessage(); input.closest('article').scrollIntoView({block:'nearest',behavior:'smooth'}); input.focus({preventScroll:true});
+      closeExpanded(); showHidden=false; const input = card(note,true); updateView(); input.closest('article').scrollIntoView({block:'nearest',behavior:'smooth'}); input.focus({preventScroll:true});
     } catch (error) { if (token === generation) message.textContent = `새 메모 생성 실패: ${error.message}`; }
     finally { if (token === generation) add.disabled = false; }
   };

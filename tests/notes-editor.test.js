@@ -12,7 +12,7 @@ class Element{
  focus(){}showModal(){this.open=true;}close(){this.open=false;this.events.close?.();}
 }
 test('16색 자동 저장과 확대 편집 후 원위치 복귀, 서식 저장 제외',async()=>{
- const grid=new Element(),body=new Element(),nodes={notesGrid:grid,notesMessage:new Element(),newNote:new Element(),retryNotes:new Element()};
+ const grid=new Element(),body=new Element(),nodes={notesGrid:grid,notesMessage:new Element(),newNote:new Element(),retryNotes:new Element(),toggleHiddenNotes:new Element(),notesTitle:new Element()};
  const writes=[];let row={id:'note',body:'기존 내용',color:'yellow',created_at:'2026-10-01T00:00:00Z'};
  const db={from:()=>{let values=null;const chain={select:()=>chain,eq:()=>chain,order:()=>chain,update:v=>{values=v;return chain;},single:async()=>{writes.push(values);row={...row,...values};return {data:{id:'note'}};},then:resolve=>resolve({data:[{...row}]})};return chain;}};
  const storage=new Map();const ctx={createAutoSaver,appColors,db,document:{body,getElementById:id=>nodes[id],createElement:tag=>new Element(tag),createComment:()=>new Element('comment'),addEventListener(){}},window:{addEventListener(){}},localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},setTimeout,clearTimeout};
@@ -22,5 +22,10 @@ test('16색 자동 저장과 확대 편집 후 원위치 복귀, 서식 저장 �
  const expand=card.querySelector('.expand-note');expand.onclick();const dialog=body.children[0];assert.equal(dialog.open,true);assert.equal(dialog.children[0],card);
  const input=card.querySelector('textarea');input.value='확대 화면에서 수정';input.events.input();await ctx.controller.flush();expand.onclick();assert.equal(dialog.open,false);assert.equal(grid.children[0],card);assert.equal(input.value,'확대 화면에서 수정');
  assert.equal('text_style' in writes.at(-1),false);
- ctx.controller.reset();await ctx.controller.open();const restored=grid.children[0].querySelector('textarea');assert.equal(restored.value,'확대 화면에서 수정');ctx.controller.reset();
+ const hide=card.querySelector('.hide-note');await hide.onclick();assert.equal(row.is_hidden,true);assert.equal(card.hidden,true);
+ nodes.toggleHiddenNotes.onclick();assert.equal(card.hidden,false);assert.equal(hide.textContent,'보이기');
+ expand.onclick();await hide.onclick();assert.equal(dialog.open,false);assert.equal(row.is_hidden,false);assert.equal(card.hidden,true);
+ nodes.toggleHiddenNotes.onclick();assert.equal(card.hidden,false);
+ await hide.onclick();
+ ctx.controller.reset();await ctx.controller.open();assert.equal(grid.children[0].hidden,true);nodes.toggleHiddenNotes.onclick();assert.equal(grid.children[0].hidden,false);const restored=grid.children[0].querySelector('textarea');assert.equal(restored.value,'확대 화면에서 수정');ctx.controller.reset();
 });
