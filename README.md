@@ -2,7 +2,7 @@
 
 ## 기존 ver1.04에서 업데이트
 
-1. 기존 공통 Supabase 프로젝트의 SQL Editor에서 `supabase/migrate-ver1.05.sql` 전체를 한 번 실행합니다. 투두리스트 테이블에 날짜 옵션 컬럼만 추가합니다. 습관 나침반 테이블과 기존 업무는 삭제하지 않습니다.
+1. 기존 공통 Supabase 프로젝트의 SQL Editor에서 `supabase/이전버전_통합.sql` 전체를 한 번 실행합니다. 투두리스트 테이블에 날짜 옵션 컬럼만 추가합니다. 습관 나침반 테이블과 기존 업무는 삭제하지 않습니다.
 2. 공공데이터포털 https://www.data.go.kr/data/15012690/openapi.do 에서 **한국천문연구원_특일 정보** 활용신청 후 일반 인증키(Decoding)를 복사합니다.
 3. 투두리스트 Vercel 프로젝트의 Settings → Environment Variables에 `DATA_GO_KR_SERVICE_KEY` 이름으로 인증키를 등록합니다. 서버 전용이므로 `VITE_`를 붙이지 않습니다. 기존 `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`는 공통 프로젝트 값을 유지합니다.
 4. 압축을 푼 파일들을 투두리스트 GitHub 저장소에 덮어씁니다. **api/**, **calendar-dates.js**, **package.json**, **package-lock.json**도 함께 올리세요. ZIP 자체를 업로드하는 방식은 사용할 수 없습니다.
@@ -34,7 +34,7 @@
 
 모바일 좌우 여백과 글자 크기를 정리하고 입력창 글자를 16px로 설정했습니다. 긴 제목·분야 이름과 설정 입력창의 가로 넘침을 방지하며 캘린더 버튼은 좁은 화면에서 줄바꿈합니다.
 
-> **이번 버전은 하나의 Supabase 프로젝트를 두 앱이 공유하도록 준비한 배포본입니다. 먼저 `공통프로젝트_연결안내.md`를 읽고 `supabase/shared-schema.sql`을 실행하세요. 아래의 개별 설치 안내보다 공통 연결 안내를 우선합니다.**
+> **이번 버전은 하나의 Supabase 프로젝트를 두 앱이 공유하도록 준비한 배포본입니다. 먼저 `공통프로젝트_연결안내.md`를 읽고 `supabase/이전버전_통합.sql`을 실행하세요. 아래의 개별 설치 안내보다 공통 연결 안내를 우선합니다.**
 
 # 나만의 학교 업무 To Do List ver1.05
 
@@ -54,7 +54,7 @@
 - 업무 수정 화면을 자동 키보드 없이 표시
 - 캘린더 좌우 스와이프 및 연도·월 직접 이동
 
-기존 사용자는 supabase/migrate-ver1.05.sql을 기존 공통 프로젝트의 SQL Editor에서 실행해야 합니다.
+기존 사용자는 supabase/이전버전_통합.sql을 기존 공통 프로젝트의 SQL Editor에서 실행해야 합니다.
 
 ## 기능
 
@@ -70,7 +70,7 @@
 ## 1. Supabase 준비
 
 1. Supabase에서 프로젝트를 생성합니다.
-2. **SQL Editor**에서 [`supabase/schema.sql`](supabase/schema.sql)의 전체 내용을 실행합니다. `todo_tasks`, `todo_categories`에 소유자 기반 Row Level Security가 적용됩니다.
+2. **SQL Editor**에서 [`supabase/이전버전_통합.sql`](supabase/이전버전_통합.sql)의 전체 내용을 실행합니다. `todo_tasks`, `todo_categories`에 소유자 기반 Row Level Security가 적용됩니다.
 3. **Authentication → Providers → Email**에서 Email 제공자가 활성화되어 있는지 확인합니다. 이메일 확인을 사용할 경우 **Authentication → URL Configuration**의 **Site URL**에 최종 Vercel 주소를 등록하고, 로컬 개발용 `http://localhost:5173/**`도 Redirect URLs에 추가하세요. 확인 메일을 쓰는 경우 메일 인증 뒤 로그인할 수 있습니다.
 4. **Project Settings → API Keys**에서 프로젝트 URL과 **publishable key**를 복사합니다. **secret key / service_role key는 절대로 앱이나 GitHub에 넣지 마세요.**
 5. 개인 계정으로 가입한 뒤 Supabase **Authentication** 설정에서 신규 회원가입을 비활성화하세요. 공개 회원가입 화면은 남지만 이후 가입 요청은 거부됩니다. 이 설정을 끄기 전까지는 주소를 아는 다른 사람도 별도 계정을 만들 수 있습니다. 각 계정의 데이터는 RLS로 분리됩니다.
@@ -126,7 +126,7 @@ JSON 백업은 **설정·백업 → JSON 백업**에서 내려받고, 같은 화
 | 파일 | 역할 |
 | --- | --- |
 | `index.html`, `style.css`, `src.js` | 화면, 모바일 레이아웃, 앱 동작 |
-| `supabase/schema.sql` | 테이블·접근 정책 |
+| `supabase/이전버전_통합.sql` | 테이블·접근 정책 |
 | `public/manifest.webmanifest`, `public/icon.svg` | 홈 화면 아이콘 및 이름 |
 | `.env.example` | 로컬 환경변수 예시 |
 

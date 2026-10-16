@@ -23,7 +23,7 @@ export function createPreferences({db,storage=localStorage,onApply,onStatus=()=>
     if(token!==generation)return;
     for(const key of Object.keys(batch))if(pending[key]===batch[key])delete pending[key];
     write(queued(id),pending);write(cache(id),normalizePreferences({...saved,...pending}));onStatus(Object.keys(pending).length?'설정 저장 중…':'');
-   }catch(error){if(token===generation)onStatus('설정 동기화 실패: '+error.message+' · 연결을 확인하세요. 최초 업데이트는 migrate-ver1.30.sql 실행이 필요합니다.');throw error;}
+   }catch(error){if(token===generation)onStatus('설정 동기화 실패: '+error.message+' · 연결을 확인하세요. 최초 업데이트는 이전버전_통합.sql 실행이 필요합니다.');throw error;}
   })();running=job;
   try{await job;}finally{if(token===generation)running=null;}
   if(token===generation&&Object.keys(pending).length)await flush();
@@ -57,7 +57,7 @@ export function createPreferences({db,storage=localStorage,onApply,onStatus=()=>
    const row=checked(await db.from('todo_preferences').select('settings').eq('user_id',id).maybeSingle());
    if(token!==generation||version!==revision||readToken!==readSequence||Object.keys(pending).length)return;
    const value=normalizePreferences(row?.settings||local||preferenceDefaults);write(cache(id),value);await onApply(value);onStatus('');
-  }catch(error){if(token===generation)onStatus('설정 동기화 실패: '+error.message+' · migrate-ver1.30.sql 실행 여부를 확인하세요.');}
+  }catch(error){if(token===generation)onStatus('설정 동기화 실패: '+error.message+' · 이전버전_통합.sql 실행 여부를 확인하세요.');}
  }
  return {open,patch,flush,sync,reset};
 }

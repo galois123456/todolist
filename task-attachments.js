@@ -20,7 +20,7 @@ export function createTaskAttachments({db,getUser}) {
       if(result.error)throw result.error;
       if(token!==generation||owner!==getUser()?.id)return;
       value=validateAttachments(result.data.attachments);ready=true;status('');
-    }catch(error){if(token===generation){status(`첨부 자료를 불러오지 못했습니다. 일정을 다시 열어주세요. ${error.message}${['42703','PGRST204'].includes(error.code)?' · migrate-ver1.24.sql 실행이 필요합니다.':''}`);}}
+    }catch(error){if(token===generation){status(`첨부 자료를 불러오지 못했습니다. 일정을 다시 열어주세요. ${error.message}${['42703','PGRST204'].includes(error.code)?' · 이전버전_통합.sql 실행이 필요합니다.':''}`);}}
     finally{if(token===generation)render();}
   }
   function open(type,edit){kind=type;editing=edit;draft=structuredClone(value);draw();dialog.showModal();}

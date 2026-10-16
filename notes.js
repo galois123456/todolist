@@ -23,7 +23,7 @@ export function createNotes({ db, getUser }) {
   expanded.addEventListener('close',()=>{if(!expanded.open)closeExpanded();});
   expanded.addEventListener('cancel',event=>{event.preventDefault();closeExpanded();});
 
-  const noteSaveError=error=>error?.code==='23514'?'메모 색상 저장 설정을 업데이트해야 합니다. Supabase에서 migrate-ver1.36.sql을 실행한 뒤 저장 재시도를 누르세요.':error?.message||'인터넷 연결을 확인한 뒤 다시 시도하세요.';
+  const noteSaveError=error=>error?.code==='23514'?'메모 색상 저장 설정을 업데이트해야 합니다. Supabase에서 이전버전_통합.sql을 실행한 뒤 저장 재시도를 누르세요.':error?.message||'인터넷 연결을 확인한 뒤 다시 시도하세요.';
   const checked = result => { if (result.error) throw result.error; return result.data; };
   const draftKey = id => `school-todo-note-draft-${owner}-${id}`;
   function cache(key, value) { try { if (value) localStorage.setItem(key, JSON.stringify(value)); else localStorage.removeItem(key); } catch {} }
@@ -74,7 +74,7 @@ export function createNotes({ db, getUser }) {
         if(expandedCard?.element===element)closeExpanded();
         note.is_hidden=next;hideButton.textContent=next?'보이기':'숨김';updateView();
       }catch(error){
-        if(token===generation)message.textContent=`메모 이동 실패: ${['42703','PGRST204'].includes(error.code)?'Supabase에서 migrate-ver1.38.sql을 먼저 실행하세요.':error.message}`;
+        if(token===generation)message.textContent=`메모 이동 실패: ${['42703','PGRST204'].includes(error.code)?'Supabase에서 이전버전_통합.sql을 먼저 실행하세요.':error.message}`;
       }finally{if(token===generation){hideButton.disabled=false;element.querySelector('.remove-note').disabled=false;}}
     };
     const expandButton=element.querySelector('.expand-note');

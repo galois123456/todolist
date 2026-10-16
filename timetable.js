@@ -127,7 +127,7 @@ export function createTimetable({db,getUser,getWeekStart,onChange=()=>{}}) {
       for(const key of details.keys())if(nextDraft.deletedRowIds.includes(key.slice(0,key.lastIndexOf(':'))))details.delete(key);
       roomProfiles.clear();cellTarget=null;
       message('선택한 시간표와 세부사항을 삭제했습니다.');onChange();
-    }catch(error){if(token===generation)message(`시간표 삭제 실패: ${error.message}${['PGRST202','42883'].includes(error.code)?' · supabase/migrate-ver1.23.sql을 먼저 실행하세요.':''}`);}
+    }catch(error){if(token===generation)message(`시간표 삭제 실패: ${error.message}${['PGRST202','42883'].includes(error.code)?' · supabase/이전버전_통합.sql을 먼저 실행하세요.':''}`);}
     finally{if(token===generation){saving=false;render();}}
   };
   $('timetableAddRow').onclick=()=>{if(!editing || saving)return;if(draft.rows.length>=100){message('행은 최대 100개까지 추가할 수 있습니다.');return;}draft.rows.push({id:crypto.randomUUID(),label:`${draft.rows.length+1}교시`,start:'',end:'',cells:{}});render();};

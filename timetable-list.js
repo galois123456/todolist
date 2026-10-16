@@ -30,12 +30,12 @@ export function createTimetableList({db,getUser,onRender,onEdit=()=>{},onCopy=as
   const selected=()=>$('sourceFilter').value!=='tasks';
   function options() {
     const value=$('sourceFilter').value;
-    $('sourceFilter').innerHTML='<option value="tasks">일정 보기</option>'+schedules.map(item=>`<option value="${escape(item.id)}">${escape(item.name)}</option>`).join('');
-    $('sourceFilter').value=schedules.some(item=>item.id===value)?value:'tasks';
+    $('sourceFilter').innerHTML='<option value="all">전체 보기</option><option value="tasks">일정 보기</option>'+schedules.map(item=>`<option value="${escape(item.id)}">${escape(item.name)}</option>`).join('');
+    $('sourceFilter').value=value==='all'||schedules.some(item=>item.id===value)?value:'tasks';
   }
   function reset() {generation++;sequence++;owner=null;schedules=[];records=[];loading=false;saving=false;error='';options();$('sourceFilter').disabled=false;$('listSourceMessage').textContent='';$('listSourceRetry').hidden=true;}
   async function loadDetails() {
-    const token=++sequence,userId=getUser()?.id,schedule=schedules.find(item=>item.id===$('sourceFilter').value);
+    const token=++sequence,userId=getUser()?.id,schedule=$('sourceFilter').value==='all'?{rows:schedules.flatMap(s=>s.rows)}:schedules.find(item=>item.id===$('sourceFilter').value);
     records=[];error='';loading=!!schedule;onRender();
     if(!schedule || !userId || userId!==owner)return;
     try{
@@ -61,32 +61,36 @@ export function createTimetableList({db,getUser,onRender,onEdit=()=>{},onCopy=as
       await loadDetails();
     }catch(cause){if(token===sequence){loading=false;error=`시간표 목록을 불러오지 못했습니다: ${cause.message}`;onRender();}}
   }
-  function render() {
+  function currentItems(keyword='',sort='due') {
+    const chosen=$('sourceFilter').value==='all'?schedules:schedules.filter(s=>s.id===$('sourceFilter').value);
+    return chosen.flatMap(schedule=>timetableEntries(schedule,records,keyword,sort).map(item=>({...item,scheduleName:schedule.name})));
+  }
+  function render(combined=null) {
     const enabled=selected();
     $('sourceFilter').disabled=saving;
     $('taskStats').hidden=enabled;
     $('categoryFilter').disabled=enabled;$('statusFilter').disabled=enabled;
     for(const kind of ['priority','category']){const option=$('sort').querySelector(`option[value="${kind}"]`);if(option)option.disabled=enabled;}
     if(enabled && ['priority','category'].includes($('sort').value))$('sort').value='due';
-    $('search').placeholder=enabled?'시간표 과목·교실·세부사항 검색':'일정 제목 검색';
+    $('search').placeholder=$ ('sourceFilter').value==='all'?'일정·시간표 검색':enabled?'시간표 과목·교실·세부사항 검색':'일정 제목 검색';
     $('listSourceMessage').textContent=error;$('listSourceRetry').hidden=!error;
-    if(!enabled)return false;
+    if(!enabled || ($('sourceFilter').value==='all' && !combined))return false;
     const schedule=schedules.find(item=>item.id===$('sourceFilter').value);
-    const items=schedule?timetableEntries(schedule,records,$('search').value.trim(),$('sort').value):[];
-    $('shownCount').textContent=loading?'':`${items.length}건`;
-    $('taskList').innerHTML=loading?'<p class="muted">시간표 세부사항을 불러오는 중…</p>':items.length?items.map(item=>{
+    const items=currentItems($('search').value.trim(),$('sort').value);
+    $('shownCount').textContent=loading?'':`${items.length+(combined?.count||0)}건`;
+    const detailsHtml=loading?'<p class="muted">시간표 세부사항을 불러오는 중…</p>':items.length?items.map(item=>{
       const color=timetableColors.find(([key])=>key===item.cell.color)?.[2] || '#cbd5e1';
       const target=`data-list-row="${escape(item.row_id)}" data-list-date="${escape(item.entry_date)}" ${saving?'disabled':''}`;
-      return `<article class="timetable-list-item" style="--detail-color:${color}"><div class="timetable-list-heading"><button type="button" class="timetable-list-title" data-list-action="edit" ${target}>${escape(item.title)}</button><div class="timetable-list-actions"><button type="button" class="text-button" data-list-action="copy" ${target}>복사</button><button type="button" class="text-button detail-delete" data-list-action="delete" ${target}>삭제</button></div></div><div class="task-meta">${escape(shareDate(item.entry_date))} ${escape([item.row.start,item.row.end].filter(Boolean).join(' ~ '))}</div><p>${escape(item.body)}</p></article>`;
+      return `<article class="timetable-list-item" style="--detail-color:${color}"><div class="timetable-list-heading"><button type="button" class="timetable-list-title" data-list-action="edit" ${target}>${escape(item.title)}</button><div class="timetable-list-actions"><button type="button" class="text-button" data-list-action="copy" ${target}>복사</button><button type="button" class="text-button detail-delete" data-list-action="delete" ${target}>삭제</button></div></div><div class="task-meta">${combined?escape(item.scheduleName)+' · ':''}${escape(shareDate(item.entry_date))} ${escape([item.row.start,item.row.end].filter(Boolean).join(' ~ '))}</div><p>${escape(item.body)}</p></article>`;
     }).join(''):'<p class="muted">이 시간표에 해당하는 세부사항이 없습니다.</p>';
+    $('taskList').innerHTML=combined?`<h3 class="list-group-title">일정</h3>${combined.html}<h3 class="list-group-title">시간표 세부사항</h3>${detailsHtml}`:detailsHtml;
     return true;
   }
   $('taskList').onclick=async event=>{
     const button=event.target.closest('[data-list-action]');
     if(!button || loading || saving || !owner || owner!==getUser()?.id)return;
     const schedule=schedules.find(item=>item.id===$('sourceFilter').value);
-    if(!schedule)return;
-    const item=timetableEntries(schedule,records).find(item=>item.row_id===button.dataset.listRow && item.entry_date===button.dataset.listDate);
+    const item=currentItems().find(item=>item.row_id===button.dataset.listRow && item.entry_date===button.dataset.listDate);
     if(!item)return;
     const action=button.dataset.listAction;
     if(action==='edit'){onEdit(item);return;}
@@ -105,5 +109,5 @@ export function createTimetableList({db,getUser,onRender,onEdit=()=>{},onCopy=as
   };
   $('sourceFilter').onchange=loadDetails;
   $('listSourceRetry').onclick=refresh;
-  return {refresh,reset,render,async setSource(id){const value=schedules.some(s=>s.id===id)?id:'tasks';if($('sourceFilter').value===value)return;$('sourceFilter').value=value;await loadDetails();}};
+  return {refresh,reset,render,renderAll(html,count){if($('sourceFilter').value==='all')render({html,count});},async setSource(id){const value=id==='all'||schedules.some(s=>s.id===id)?id:'tasks';if($('sourceFilter').value===value)return;$('sourceFilter').value=value;await loadDetails();}};
 }

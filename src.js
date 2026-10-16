@@ -19,7 +19,7 @@ const colorPickers=installColorPickers();
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const configured = /^https:\/\/.+\.supabase\.co\/?$/.test(url || '') && key && !key.includes('YOUR_');
-const saveStatus=createSaveStatus({onChange:({state,text,title})=>{const el=$('serverSaveStatus');el.dataset.state=state;el.textContent=text;el.title=title;}});
+const saveStatus=createSaveStatus({onChange:({state,text,title,savedAt,savedLabel})=>{const el=$('serverSaveStatus');el.dataset.state=state;el.textContent=text;el.title=title;const stamp=$('serverSavedAt');stamp.textContent=savedLabel;stamp.dateTime=savedAt;stamp.hidden=!savedAt;}});
 const db = configured ? createClient(url, key, {
   global: { fetch: saveStatus.fetch },
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
@@ -225,7 +225,7 @@ function renderCategoryOptions() {
 }
 function renderTasks() {
   if(timetableList.render())return;
-  const keyword = $('search').value.trim().toLocaleLowerCase(); const status = $('statusFilter').value; const cat = $('categoryFilter').value; const today = localDate(new Date());
+  const keyword = $('search').value.trim().toLocaleLowerCase(); const status = $('sourceFilter').value==='all'?'all':$('statusFilter').value; const cat = $('sourceFilter').value==='all'?'all':$('categoryFilter').value; const today = localDate(new Date());
   const items = state.tasks.filter(t => {
     if (cat !== 'all' && t.category_id !== cat) return false;
     if (keyword && !`${t.title} ${t.note}`.toLocaleLowerCase().includes(keyword)) return false;
@@ -235,6 +235,7 @@ function renderTasks() {
   const taskCard = t => `<article class="task-card ${t.completed ? 'done' : ''} ${isOverdue(t) ? 'overdue' : ''} priority-${t.priority}"><div class="task-body"><button type="button" class="task-name" data-edit="${escapeHtml(t.id)}">${escapeHtml(t.title)}</button><div class="task-meta"><span class="category-name" style="${categoryStyle(t.category_id)}">${escapeHtml(categoryName(t.category_id))}</span><span>중요도 ${priorityName[t.priority]}</span><span>시작 ${escapeHtml(taskDateLabel(t, 'start'))}</span><span>마감 ${escapeHtml(taskDateLabel(t, 'due'))}</span>${t.yearly_repeat ? '<span>매년 반복</span>' : ''}${isOverdue(t) ? '<span>기한 초과</span>' : ''}</div></div><div class="task-actions"><button type="button" class="complete-btn" data-toggle="${escapeHtml(t.id)}" aria-label="${escapeHtml(t.title)} ${t.completed ? '되돌리기' : '완료'}">${t.completed ? '되돌리기' : '완료'}</button>${t.completed ? `<button type="button" class="delete-completed" data-delete="${escapeHtml(t.id)}">삭제</button>` : ''}</div></article>`;
   const active = items.filter(t => !t.completed), done = items.filter(t => t.completed);
   $('taskList').innerHTML = (active.length ? active.map(taskCard).join('') : '<div class="empty">진행 중인 일정이 없습니다.</div>') + (done.length ? `<div class="completed-section"><h3>완료한 일정</h3>${done.map(taskCard).join('')}</div>` : '');
+  timetableList.renderAll($('taskList').innerHTML,items.length);
 }
 ['search', 'statusFilter', 'categoryFilter', 'sort'].forEach(id => $(id).addEventListener('input', () => {renderTasks();if(id==='sort')renderCalendar();preferences.patch({[id]:$(id).value});}));
 $('sourceFilter').addEventListener('change',()=>{renderCalendar();preferences.patch({sourceFilter:$('sourceFilter').value,sort:$('sort').value});});

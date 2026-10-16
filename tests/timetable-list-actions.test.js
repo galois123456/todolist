@@ -40,3 +40,18 @@ test('시간표를 열기 전에도 목록에서 기존 편집창으로 저장�
  assert.equal(saved.table,'todo_timetable_details');assert.equal(saved.value.row_id,'row-1');assert.equal(saved.value.entry_date,'2026-09-29');assert.equal(saved.value.user_id,'owner');assert.equal(saved.value.body,'수정된 평가 안내');assert.equal(changes,1);assert.equal($('timetableCellDialog').open,false);
  }finally{globalThis.document=before;}
 });
+
+test('전체 보기에서 모든 시간표 조회·검색·편집 및 선택 복원',async()=>{
+ const before=globalThis.document;globalThis.document=setupNodes();const $=id=>document.getElementById(id);
+ const row2={...row,id:'row-2'};let requested,edited;
+ const records=[{...entry},{...entry,row_id:'row-2',body:'두번째 세부사항'}];
+ const db={from(){const chain={select(){return chain;},eq(){return chain;},in(k,ids){requested=ids;return chain;},order(){return chain;},range(){return chain;},maybeSingle(){return Promise.resolve({data:{template:{schedules:[{id:'one',name:'기본',rows:[row]},{id:'two',name:'별도',rows:[row2]}],activeId:'one'}}});},then(resolve){return Promise.resolve({data:records}).then(resolve);}};return chain;}};
+ let app;
+ try{
+ app=createTimetableList({db,getUser:()=>({id:'owner'}),onRender:()=>{if(!app.render())app.renderAll('<article>일정 예시</article>',1);},onEdit:item=>edited=item});
+ await app.refresh();await app.setSource('all');assert.deepEqual(requested,['row-1','row-2']);assert.match($('taskList').innerHTML,/일정 예시/);assert.match($('taskList').innerHTML,/4444444/);assert.match($('taskList').innerHTML,/두번째 세부사항/);assert.equal($('shownCount').textContent,'3건');
+ await $('taskList').onclick({target:{closest:()=>({dataset:{listAction:'edit',listRow:'row-2',listDate:entry.entry_date}})}});assert.equal(edited.row_id,'row-2');
+ $('search').value='두번째';app.renderAll('',0);assert.doesNotMatch($('taskList').innerHTML,/4444444/);assert.match($('taskList').innerHTML,/두번째 세부사항/);
+ await app.refresh();assert.equal($('sourceFilter').value,'all');
+ }finally{globalThis.document=before;}
+});
