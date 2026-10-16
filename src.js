@@ -34,7 +34,7 @@ const attachments=createTaskAttachments({db,getUser:()=>state.user});
 const priorityName = { high: '높음', medium: '보통', low: '낮음' };
 const $views = { list: $('listView'), calendar: $('calendarView'), input: $('inputView'), settings: $('settingsView'), notes: $('notesView'), timetable: $('timetableView') };
 const notes = createNotes({ db, getUser: () => state.user });
-const timetableList=createTimetableList({db,getUser:()=>state.user,onRender:renderTasks,onEdit:item=>timetable.editDetail(item),onCopy:copyText,onChanged:()=>timetable.render()});
+const timetableList=createTimetableList({db,getUser:()=>state.user,getWeekStart:()=>weekStart,onRender:renderTasks,onEdit:item=>timetable.editDetail(item),onCopy:copyText,onChanged:()=>timetable.render()});
 const timetable = createTimetable({ db, getUser: () => state.user, getWeekStart: () => timetableWeekStart, onChange:()=>{timetableList.refresh();} });
 
 
@@ -225,7 +225,7 @@ function renderCategoryOptions() {
 }
 function renderTasks() {
   if(timetableList.render())return;
-  const keyword = $('search').value.trim().toLocaleLowerCase(); const status = $('sourceFilter').value==='all'?'all':$('statusFilter').value; const cat = $('sourceFilter').value==='all'?'all':$('categoryFilter').value; const today = localDate(new Date());
+  const keyword = $('search').value.trim().toLocaleLowerCase(); const status = $('statusFilter').value; const cat = $('categoryFilter').value; const today = localDate(new Date());
   const items = state.tasks.filter(t => {
     if (cat !== 'all' && t.category_id !== cat) return false;
     if (keyword && !`${t.title} ${t.note}`.toLocaleLowerCase().includes(keyword)) return false;

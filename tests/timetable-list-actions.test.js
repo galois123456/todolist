@@ -49,9 +49,15 @@ test('전체 보기에서 모든 시간표 조회·검색·편집 및 선택 복
  let app;
  try{
  app=createTimetableList({db,getUser:()=>({id:'owner'}),onRender:()=>{if(!app.render())app.renderAll('<article>일정 예시</article>',1);},onEdit:item=>edited=item});
- await app.refresh();await app.setSource('all');assert.deepEqual(requested,['row-1','row-2']);assert.match($('taskList').innerHTML,/일정 예시/);assert.match($('taskList').innerHTML,/4444444/);assert.match($('taskList').innerHTML,/두번째 세부사항/);assert.equal($('shownCount').textContent,'3건');
+ await app.refresh();$('sort').value='priority';$('categoryFilter').value='school';$('statusFilter').value='active';await app.setSource('all');
+ assert.equal($('categoryFilter').disabled,false);assert.equal($('statusFilter').disabled,false);
+ assert.equal($('categoryFilter').value,'school');assert.equal($('statusFilter').value,'active');assert.equal($('sort').value,'priority');assert.deepEqual(requested,['row-1','row-2']);assert.match($('taskList').innerHTML,/일정 예시/);assert.match($('taskList').innerHTML,/4444444/);assert.match($('taskList').innerHTML,/두번째 세부사항/);assert.equal($('shownCount').textContent,'3건');
  await $('taskList').onclick({target:{closest:()=>({dataset:{listAction:'edit',listRow:'row-2',listDate:entry.entry_date}})}});assert.equal(edited.row_id,'row-2');
  $('search').value='두번째';app.renderAll('',0);assert.doesNotMatch($('taskList').innerHTML,/4444444/);assert.match($('taskList').innerHTML,/두번째 세부사항/);
  await app.refresh();assert.equal($('sourceFilter').value,'all');
+ $('search').value='';$('statusFilter').value='today';app.renderAll('',0);
+ const today=new Date();const isToday=entry.entry_date===`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+ assert.equal($('shownCount').textContent,isToday?'2건':'0건');
+ $('statusFilter').value='active';app.renderAll('',0);assert.equal($('shownCount').textContent,'2건');
  }finally{globalThis.document=before;}
 });

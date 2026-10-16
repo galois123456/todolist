@@ -101,3 +101,12 @@
 .notes-toolbar{justify-content:flex-start}
 .note-tools{flex-wrap:nowrap}
 @media(max-width:760px){.note-tools{gap:4px}.note-tools > button,.note-tools > .paper-picker > summary{padding-left:6px;padding-right:6px}}
+
+/* 메모 확대/닫기와 메모함 전환을 명확하게 구분 */
+.note-tools > .expand-note{font-weight:900}
+#toggleHiddenNotes{color:#6d28d9;background:#ede9fe;border:1px solid #c4b5fd}
+#toggleHiddenNotes:hover{background:#ddd6fe}
+#toggleHiddenNotes[aria-pressed="true"]{color:#1d4ed8;background:#dbeafe;border-color:#93c5fd}
+#toggleHiddenNotes[aria-pressed="true"]:hover{background:#bfdbfe}
+:root[data-theme=dark] #toggleHiddenNotes{color:#ddd6fe;background:#4c1d95;border-color:#8b5cf6}
+:root[data-theme=dark] #toggleHiddenNotes[aria-pressed="true"]{color:#dbeafe;background:#1e3a8a;border-color:#60a5fa}

@@ -1,4 +1,5 @@
 import { normalizeTimetables, timetableColors } from './timetable-model.js';
+import { dueInPeriod } from './task-filters.js';
 import { shareDate } from './schedule-share.js';
 
 export function timetableEntries(schedule, records, keyword='', sort='due') {
@@ -22,7 +23,7 @@ export function timetableDetailText(item) {
   return `<${item.cell.subject || item.row.label || '시간표 세부사항'}>\n\n장소 : ${item.cell.room || ''}\n\n날짜 : ${shareDate(item.entry_date)}${item.row.label?' '+item.row.label:''}\n\n내용 : ${item.body || ''}`;
 }
 
-export function createTimetableList({db,getUser,onRender,onEdit=()=>{},onCopy=async()=>{},onChanged=()=>{}}) {
+export function createTimetableList({db,getUser,onRender,onEdit=()=>{},onCopy=async()=>{},onChanged=()=>{},getWeekStart=()=> 'monday'}) {
   const $=id=>document.getElementById(id);
   const escape=value=>String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const checked=result=>{if(result.error)throw result.error;return result.data;};
@@ -66,17 +67,24 @@ export function createTimetableList({db,getUser,onRender,onEdit=()=>{},onCopy=as
     return chosen.flatMap(schedule=>timetableEntries(schedule,records,keyword,sort).map(item=>({...item,scheduleName:schedule.name})));
   }
   function render(combined=null) {
-    const enabled=selected();
+    const enabled=selected(), timetableOnly=enabled && $('sourceFilter').value!=='all';
     $('sourceFilter').disabled=saving;
     $('taskStats').hidden=enabled;
-    $('categoryFilter').disabled=enabled;$('statusFilter').disabled=enabled;
-    for(const kind of ['priority','category']){const option=$('sort').querySelector(`option[value="${kind}"]`);if(option)option.disabled=enabled;}
-    if(enabled && ['priority','category'].includes($('sort').value))$('sort').value='due';
+    $('categoryFilter').disabled=timetableOnly;$('statusFilter').disabled=timetableOnly;
+    for(const kind of ['priority','category']){const option=$('sort').querySelector(`option[value="${kind}"]`);if(option)option.disabled=timetableOnly;}
+    if(timetableOnly && ['priority','category'].includes($('sort').value))$('sort').value='due';
     $('search').placeholder=$ ('sourceFilter').value==='all'?'일정·시간표 검색':enabled?'시간표 과목·교실·세부사항 검색':'일정 제목 검색';
     $('listSourceMessage').textContent=error;$('listSourceRetry').hidden=!error;
     if(!enabled || ($('sourceFilter').value==='all' && !combined))return false;
     const schedule=schedules.find(item=>item.id===$('sourceFilter').value);
-    const items=currentItems($('search').value.trim(),$('sort').value);
+    let items=currentItems($('search').value.trim(),$('sort').value);
+    if(combined){
+      const status=$('statusFilter').value,now=new Date();
+      const today=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+      if(['today','week','month','threeDays','fiveDays','sevenDays'].includes(status))
+        items=items.filter(item=>dueInPeriod({due_date:item.entry_date},status,today,getWeekStart()));
+      else if(status==='overdue')items=items.filter(item=>item.entry_date<today);
+    }
     $('shownCount').textContent=loading?'':`${items.length+(combined?.count||0)}건`;
     const detailsHtml=loading?'<p class="muted">시간표 세부사항을 불러오는 중…</p>':items.length?items.map(item=>{
       const color=timetableColors.find(([key])=>key===item.cell.color)?.[2] || '#cbd5e1';
