@@ -1,0 +1,28 @@
+/* ver1.41: compact sticky masthead, shared by every app screen. */
+:root{--app-header-height:140px;scroll-padding-top:calc(var(--app-header-height) + 8px)}
+.main-wrap{margin-top:8px}
+.topbar{
+  position:sticky;top:0;z-index:20;
+  padding:calc(6px + env(safe-area-inset-top,0px)) 0 6px;
+  margin-bottom:8px;background:var(--bg);
+  border-bottom:1px solid var(--line);
+}
+.topbar h1{font-size:26px;line-height:1.25;margin:0}
+.app-title-link{
+  display:block;font:inherit;font-weight:inherit;letter-spacing:inherit;
+  line-height:inherit;text-align:left;color:inherit;
+  border:0;background:transparent;border-radius:4px;padding:0;
+}
+.app-title-link:hover{color:var(--accent)}
+.topbar .title-line{gap:6px 10px;margin-bottom:6px}
+.topbar .app-title-row{gap:4px 12px}
+.topbar .date-box{padding:7px 14px;margin:0;border-radius:10px;line-height:1.4}
+@media(max-width:760px){
+  .main-wrap{margin-top:0}
+  .topbar{padding:calc(4px + env(safe-area-inset-top,0px)) 6px 5px;margin-bottom:6px}
+  .topbar h1{font-size:clamp(18px,5.2vw,22px);line-height:1.25}
+  .topbar .title-line{gap:5px;margin-bottom:5px}
+  .topbar .app-title-row{gap:3px 8px}
+  .topbar .server-save-status{padding:3px 8px;line-height:1.35}
+  .topbar .date-box{padding:6px 12px;font-size:15px;line-height:1.4}
+}

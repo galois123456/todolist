@@ -1,4 +1,5 @@
 import { createSaveStatus } from './save-status.js';
+import { installStickyHeader } from './sticky-header.js';
 import { createPreferences } from './preferences.js';
 import { dueInPeriod, compareTasks } from './task-filters.js';
 import { createTaskAttachments } from './task-attachments.js';
@@ -15,6 +16,7 @@ import { categoryColors, categoryColor } from './category-colors.js';
 import { taskOnDay, taskDates, validateTaskDates, resolveDate } from './calendar-dates.js';
 
 const $ = id => document.getElementById(id);
+installStickyHeader(document.querySelector('.topbar'));
 const colorPickers=installColorPickers();
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
