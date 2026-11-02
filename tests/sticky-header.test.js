@@ -24,7 +24,7 @@ test('상단 높이 변경·로그인 표시·회전 시 스크롤 여유 공간
 
 test('제목은 키보드로 누를 수 있는 캘린더 버튼이며 기존 이동 보호를 사용',()=>{
   const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
-  assert.match(html,/<h1><button id="appHome"[^>]*data-view="calendar"[^>]*>나만의 학교 일정 To Do List<\/button><\/h1>/);
+  assert.match(html,/<h1><button id="appHome"[^>]*data-view="calendar"[^>]*>나만의 To Do List<\/button><\/h1>/);
   const source=readFileSync(new URL('../src.js',import.meta.url),'utf8');
   const body=source.slice(source.indexOf('function switchView(view)'),source.indexOf('\nfunction categoryName'));
   let flushed=0,rendered=0,scrolled=0,allowed=true;

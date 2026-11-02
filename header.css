@@ -15,14 +15,26 @@
 }
 .app-title-link:hover{color:var(--accent)}
 .topbar .title-line{gap:6px 10px;margin-bottom:6px}
-.topbar .app-title-row{gap:4px 12px}
+.topbar .app-title-row{gap:4px 12px;flex-wrap:nowrap;max-width:100%}
+.topbar h1{flex:none;white-space:nowrap}
+.topbar .server-save-group{flex-direction:row;flex-wrap:nowrap;gap:5px;min-width:0}
 .topbar .date-box{padding:7px 14px;margin:0;border-radius:10px;line-height:1.4}
 @media(max-width:760px){
   .main-wrap{margin-top:0}
   .topbar{padding:calc(4px + env(safe-area-inset-top,0px)) 6px 5px;margin-bottom:6px}
-  .topbar h1{font-size:clamp(18px,5.2vw,22px);line-height:1.25}
+  .topbar h1{font-size:clamp(15px,4.5vw,20px);line-height:1.25}
   .topbar .title-line{gap:5px;margin-bottom:5px}
-  .topbar .app-title-row{gap:3px 8px}
-  .topbar .server-save-status{padding:3px 8px;line-height:1.35}
+  .topbar .app-title-row{gap:5px;width:100%}
+  .topbar .server-save-status{font-size:9px;padding:3px 5px;line-height:1.35;gap:3px}
+  .topbar .server-save-status:before{width:5px;height:5px}
+  .topbar .server-save-group{gap:4px;flex-shrink:0}
+  .topbar .server-saved-at{font-size:8px;letter-spacing:-.3px}
   .topbar .date-box{padding:6px 12px;font-size:15px;line-height:1.4}
+}
+@media(max-width:350px){
+  .topbar h1{font-size:14px}
+  .topbar .app-title-row{gap:3px}
+  .topbar .server-save-status{font-size:8px;padding:3px}
+  .topbar .server-save-group{gap:3px}
+  .topbar .server-saved-at{font-size:7px}
 }
