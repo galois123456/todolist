@@ -1,0 +1,62 @@
+import {JSDOM} from 'jsdom';
+import {readFileSync} from 'node:fs';
+import {createNotes} from '../notes.js';
+
+export function notesFixture({folderRows,noteRows}={}) {
+  const dom=new JSDOM(readFileSync(new URL('../index.html',import.meta.url),'utf8'),{url:'https://test.invalid'});
+  const {window}=dom;
+  window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
+  window.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new window.Event('close'));};
+  window.HTMLElement.prototype.scrollIntoView=function(){};
+  const prior={};for(const k of ['document','window','localStorage','confirm'])prior[k]=globalThis[k];
+  Object.assign(globalThis,{window,document:window.document,localStorage:window.localStorage});
+  let confirmed=true,confirmation='',user={id:'owner'};
+  globalThis.confirm=text=>{confirmation=text;return confirmed;};
+  const now='2026-11-04T12:00:00Z';
+  const data={
+    todo_note_folders:folderRows || [{id:'general',user_id:'owner',name:'일반 메모함',legacy_key:'general',created_at:now},{id:'hidden',user_id:'owner',name:'숨김 메모함',legacy_key:'hidden',created_at:now}],
+    todo_notes:noteRows || [{id:'note',user_id:'owner',folder_id:'general',body:'기존 내용',color:'yellow',created_at:now,is_hidden:false},{id:'hidden-note',user_id:'owner',folder_id:'hidden',body:'기존 숨김',color:'pink',created_at:now,is_hidden:true}]
+  };
+  const calls=[];let fail=null,beforeWrite=null,serial=0;
+  const db={from(table){
+    let mode='read',values=null,filters={},range=null,single=false,order=[];
+    const q={select(){return q;},eq(k,v){filters[k]=v;return q;},order(k,v){order.push([k,v]);return q;},range(a,b){range=[a,b];return q;},update(v){mode='update';values=v;return q;},insert(v){mode='insert';values=v;return q;},delete(){mode='delete';return q;},single(){single=true;return q;},then(resolve,reject){
+      return (async()=>{
+        const call={table,mode,values,filters,range};calls.push(call);
+        if(beforeWrite && mode!=='read')await beforeWrite(call);
+        if(fail?.(call))return {error:{code:fail.code || 'offline',message:'테스트 통신 오류'}};
+        let rows=(data[table]||[]).filter(r=>Object.entries(filters).every(([k,v])=>r[k]===v));
+        if(mode==='insert'){
+          if(table==='todo_notes' && !data.todo_note_folders.some(f=>f.id===values.folder_id && f.user_id===values.user_id))return {error:{code:'23503'}};
+          rows=[{id:'new-'+(++serial),created_at:new Date().toISOString(),...values}];data[table].unshift(...rows);
+        }
+        if(mode==='update'){
+          if(values.folder_id && !data.todo_note_folders.some(f=>f.id===values.folder_id && f.user_id===filters.user_id))return {error:{code:'23503'}};
+          rows.forEach(row=>Object.assign(row,values));
+        }
+        if(mode==='delete'){
+          data[table]=data[table].filter(row=>!rows.includes(row));
+          if(table==='todo_note_folders')data.todo_notes=data.todo_notes.filter(n=>!rows.some(f=>f.id===n.folder_id && f.user_id===n.user_id));
+        }
+        for(const [k,{ascending}] of order.toReversed()) rows.sort((a,b)=>String(a[k]).localeCompare(String(b[k]))*(ascending?1:-1));
+        if(range)rows=rows.slice(range[0],range[1]+1);
+        if(single && rows.length!==1)return {error:{code:'PGRST116'}};
+        return {data:structuredClone(single?rows[0]:rows)};
+      })().then(resolve,reject);
+    }};return q;
+  }};
+  const app=createNotes({db,getUser:()=>user}),$=id=>document.getElementById(id);
+  return {app,$,window,data,calls,
+    cards:()=>[...$('notesGrid').children],
+    visible:()=>[...$('notesGrid').children].filter(c=>!c.hidden),
+    choose(id){$('noteFolderSelect').value=id;$('noteFolderSelect').onchange();},
+    manage(){ $('manageNoteFolders').onclick(); },
+    async folder(name){$('noteFolderName').value=name;await $('noteFolderForm').onsubmit({preventDefault(){}});},
+    async removeFolder(id){await $('noteFolderList').onclick({target:$('noteFolderList').querySelector(`[data-folder-delete="${id}"]`)});},
+    async renameFolder(id,name){await $('noteFolderList').onclick({target:$('noteFolderList').querySelector(`[data-folder-rename="${id}"]`)});await this.folder(name);},
+    async move(card,id){card.querySelector('.move-note').onclick();$('noteMoveTarget').value=id;await $('noteMoveForm').onsubmit({preventDefault(){}});},
+    confirm(value){confirmed=value;},confirmation:()=>confirmation,
+    fail(fn){fail=fn;},before(fn){beforeWrite=fn;},user(value){user=value;},
+    close(){app.reset();dom.window.close();Object.assign(globalThis,prior);}
+  };
+}

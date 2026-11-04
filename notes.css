@@ -104,9 +104,27 @@
 
 /* 메모 확대/닫기와 메모함 전환을 명확하게 구분 */
 .note-tools > .expand-note{font-weight:900}
-#toggleHiddenNotes{color:#6d28d9;background:#ede9fe;border:1px solid #c4b5fd}
-#toggleHiddenNotes:hover{background:#ddd6fe}
-#toggleHiddenNotes[aria-pressed="true"]{color:#1d4ed8;background:#dbeafe;border-color:#93c5fd}
-#toggleHiddenNotes[aria-pressed="true"]:hover{background:#bfdbfe}
-:root[data-theme=dark] #toggleHiddenNotes{color:#ddd6fe;background:#4c1d95;border-color:#8b5cf6}
-:root[data-theme=dark] #toggleHiddenNotes[aria-pressed="true"]{color:#dbeafe;background:#1e3a8a;border-color:#60a5fa}
+.notes-toolbar .note-folder-select{margin:0;min-width:0;width:240px;max-width:100%;min-height:43px;border-radius:12px;font-weight:700;color:var(--accent);background:var(--soft)}
+#manageNoteFolders{white-space:nowrap}
+.note-folder-dialog{width:min(600px,calc(100% - 24px));max-height:calc(100dvh - 32px);overflow:auto}
+.note-folder-dialog-body{padding:22px}
+.note-folder-dialog h2{font-size:1.2rem;margin:0 0 12px}
+.note-folder-dialog label{display:block;margin-top:14px;font-weight:700}
+.note-folder-list{display:grid;gap:8px;margin:14px 0 20px}
+.note-folder-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.note-folder-row>div:first-child{min-width:0;overflow-wrap:anywhere}
+.note-folder-row small{display:block;color:var(--muted);margin-top:3px;font-size:.75rem}
+.note-folder-actions{display:flex;align-items:center;flex:none;gap:4px}
+.note-folder-actions button{white-space:nowrap;font-size:.8rem}
+.note-folder-actions .note-folder-delete{background:#fee2e2;color:#b91c1c;border-radius:7px}
+:root[data-theme=dark] .note-folder-actions .note-folder-delete{background:#48272d;color:#fca5a5}
+.note-folder-dialog .dialog-actions{flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:760px){
+ .notes-toolbar{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px;margin-bottom:12px}
+ .notes-toolbar .note-folder-select{width:100%;font-size:.85rem;padding:8px;min-height:42px}
+ .notes-toolbar #manageNoteFolders{grid-column:2;justify-self:end;font-size:.8rem;min-height:32px;padding:6px 10px}
+ .note-folder-dialog-body{padding:16px}
+ .note-folder-row{padding:8px;gap:5px}
+ .note-folder-actions{gap:2px}
+ .note-folder-actions button{padding:7px 5px}
+}
