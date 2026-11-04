@@ -102,29 +102,68 @@
 .note-tools{flex-wrap:nowrap}
 @media(max-width:760px){.note-tools{gap:4px}.note-tools > button,.note-tools > .paper-picker > summary{padding-left:6px;padding-right:6px}}
 
-/* 메모 확대/닫기와 메모함 전환을 명확하게 구분 */
+/* 메모 확대/닫기 */
 .note-tools > .expand-note{font-weight:900}
-.notes-toolbar .note-folder-select{margin:0;min-width:0;width:240px;max-width:100%;min-height:43px;border-radius:12px;font-weight:700;color:var(--accent);background:var(--soft)}
-#manageNoteFolders{white-space:nowrap}
+.notes-toolbar .button,.notes-toolbar .note-folder-select{box-sizing:border-box;min-height:43px;height:43px;text-align:center;line-height:1.2;border-radius:12px;font-size:.9rem}
+.notes-toolbar .toolbar-label-short{display:none}
+.notes-toolbar .note-folder-select{margin:0;min-width:0;width:260px;max-width:100%;padding:0 34px;text-align-last:center;font-weight:750;color:#6d4ca4;background-color:#f2eef9;border:1px solid #e0d7ee;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%238a71b3' stroke-width='1.6' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;cursor:pointer;transition:background-color .15s,border-color .15s}
+.notes-toolbar .note-folder-select:hover{background-color:#ebe4f6;border-color:#c9b9df}
+.notes-toolbar .note-folder-select option{background:var(--surface);color:var(--text)}
+.notes-toolbar #manageNoteFolders{white-space:nowrap;color:#5d6678;background:#f5f6f8;border:1px solid #e3e7ed;box-shadow:0 1px 2px #26334c06;gap:6px}
+.notes-toolbar #manageNoteFolders:hover{background:#eaeef4;border-color:#cbd3df}
+.notes-toolbar #editNoteOrder{color:#52648e;background:#f3f6fc;border:1px solid #dfe6f3;margin-left:auto}
+.notes-toolbar #editNoteOrder[aria-pressed=true]{background:#5367a0;color:#fff;border-color:#5367a0}
+.notes-toolbar .note-folder-select:focus-visible,.notes-toolbar #manageNoteFolders:focus-visible,.notes-toolbar #editNoteOrder:focus-visible{outline:2px solid #9b80c3;outline-offset:2px}
+:root[data-theme=dark] .notes-toolbar .note-folder-select{color:#d4c3ed;background-color:#332d43;border-color:#51455e}
+:root[data-theme=dark] .notes-toolbar #manageNoteFolders{color:#d4dae5;background:#282f3d;border-color:#414b5c}
+:root[data-theme=dark] .notes-toolbar #editNoteOrder{color:#ced8ee;background:#2b354b;border-color:#455472}
+:root[data-theme=dark] .notes-toolbar #editNoteOrder[aria-pressed=true]{background:#5367a0;color:#fff}
 .note-folder-dialog{width:min(600px,calc(100% - 24px));max-height:calc(100dvh - 32px);overflow:auto}
 .note-folder-dialog-body{padding:22px}
 .note-folder-dialog h2{font-size:1.2rem;margin:0 0 12px}
 .note-folder-dialog label{display:block;margin-top:14px;font-weight:700}
+.note-folder-dialog input,.note-folder-dialog select{width:100%;min-width:0;min-height:44px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:7px;background:var(--surface);color:var(--text)}
 .note-folder-list{display:grid;gap:8px;margin:14px 0 20px}
-.note-folder-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
-.note-folder-row>div:first-child{min-width:0;overflow-wrap:anywhere}
+.note-folder-row{display:grid;grid-template-columns:32px minmax(0,1fr) auto auto;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;padding:10px}
+.note-folder-info{min-width:0;overflow-wrap:anywhere;font-size:.9rem}
 .note-folder-row small{display:block;color:var(--muted);margin-top:3px;font-size:.75rem}
 .note-folder-actions{display:flex;align-items:center;flex:none;gap:4px}
 .note-folder-actions button{white-space:nowrap;font-size:.8rem}
 .note-folder-actions .note-folder-delete{background:#fee2e2;color:#b91c1c;border-radius:7px}
 :root[data-theme=dark] .note-folder-actions .note-folder-delete{background:#48272d;color:#fca5a5}
 .note-folder-dialog .dialog-actions{flex-wrap:wrap;justify-content:flex-end}
+.note-folder-order{display:flex;gap:4px}
+.order-handle,.order-step{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:8px;padding:4px;min-width:32px;min-height:36px;text-align:center;font-weight:750;line-height:1}
+.order-handle{font-size:22px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.order-handle:active{cursor:grabbing}
+.order-step{font-size:.85rem}
+.order-step:disabled{cursor:default;opacity:.3}
+.note-order-help,.note-order-status{font-size:.82rem;line-height:1.5;color:var(--muted);margin:0 0 12px}
+.note-order-status:empty{display:none}
+.note-order-status[data-state=error]{color:var(--danger)}
+.note-order-bar{display:flex;align-items:center;gap:6px;padding:0 0 10px;margin:0 0 8px;border-bottom:1px solid #0002;flex-shrink:0}
+.note-order-position{margin-right:auto;font-size:.8rem;color:#475569;font-variant-numeric:tabular-nums}
+.note-order-bar .order-handle,.note-order-bar .order-step{background:#ffffff8f;border-color:#0002;color:#475569}
+.note-order-bar .order-step{padding:6px 10px}
+.notes-order-editing .sticky-note{outline:1px dashed #aebbd5;outline-offset:3px}
+.notes-order-editing .sticky-top{display:none}
+.notes-order-editing .note-body:disabled{opacity:1;-webkit-text-fill-color:#27272a;cursor:default}
+.order-dragging{opacity:.45}
+.order-drop-target{outline:3px solid #8b72b4!important;outline-offset:3px;box-shadow:0 0 0 6px #8b72b419}
+.note-order-drag-label{position:fixed;z-index:1000;pointer-events:none;border-radius:10px;padding:9px 12px;background:#6f5598;color:#fff;font-size:13px;font-weight:750;box-shadow:0 5px 18px #0003;max-width:180px}
 @media(max-width:760px){
- .notes-toolbar{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px;margin-bottom:12px}
- .notes-toolbar .note-folder-select{width:100%;font-size:.85rem;padding:8px;min-height:42px}
- .notes-toolbar #manageNoteFolders{grid-column:2;justify-self:end;font-size:.8rem;min-height:32px;padding:6px 10px}
+ .notes-toolbar{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:4px;margin-bottom:12px;align-items:center}
+ .notes-toolbar .toolbar-label-full{display:none}
+ .notes-toolbar .toolbar-label-short{display:inline}
+ .notes-toolbar .note-folder-select{width:100%;min-width:0;font-size:16px;padding:0 20px 0 6px;min-height:42px;height:42px;background-position:right 5px center;background-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .notes-toolbar .button{height:42px;min-height:42px;min-width:0;padding:0 7px;font-size:12px;border-radius:10px}
+ .notes-toolbar #manageNoteFolders{grid-column:auto;font-size:12px;padding:0 7px}
+ .notes-toolbar #editNoteOrder{grid-column:auto;justify-self:stretch;margin-left:0;font-size:12px;padding:0 7px}
  .note-folder-dialog-body{padding:16px}
- .note-folder-row{padding:8px;gap:5px}
+ .note-folder-row{padding:8px;gap:6px;grid-template-columns:36px minmax(0,1fr) auto}
+ .note-folder-row>.order-handle{grid-row:1/3;min-height:44px}
+ .note-folder-actions{grid-column:2/4;justify-content:flex-end}
  .note-folder-actions{gap:2px}
- .note-folder-actions button{padding:7px 5px}
+ .note-folder-actions button{padding:8px 10px;min-height:36px}
+ .order-handle,.order-step{min-width:36px;min-height:40px}
 }

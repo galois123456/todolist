@@ -100,7 +100,7 @@ test('계정 전환 뒤 늦게 도착한 생성 응답을 새 계정에 표시�
 test('추가 SQL 미실행 시 안내하고 새 메모·메모함 저장은 잠금',async()=>{
  const f=notesFixture();try{
   const fail=c=>c.table==='todo_note_folders';fail.code='PGRST205';f.fail(fail);
-  await f.app.open();assert.match(f.$('notesMessage').textContent,/현재버전_추가.sql/);
+  await f.app.open();assert.match(f.$('notesMessage').textContent,/ver1.44까지_통합.sql/);
   assert.equal(f.$('newNote').disabled,true);assert.equal(f.$('manageNoteFolders').disabled,true);
   f.fail(null);await f.$('retryNotes').onclick();assert.equal(f.$('newNote').disabled,false);
  }finally{f.close();}

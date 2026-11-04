@@ -1,0 +1,48 @@
+<!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>메모 UI 테스트 · 서버 연결 없음</title></head><body><script type="module">
+// Manual UI regression fixture. Never connects to Supabase or real accounts.
+import {createNotes} from '../notes.js';
+import {installColorPickers} from '../color-pickers.js';
+const params=new URLSearchParams(location.search);
+if(params.has('mobile')){
+  document.body.style='margin:0;background:#e5e7eb;display:grid;justify-content:center';
+  const frame=document.createElement('iframe');frame.src=location.pathname+'?frame=1';frame.width=String(Math.min(760,Math.max(320,Number(params.get('width'))||390)));frame.height='844';frame.style='border:0;background:white';document.body.append(frame);
+}else{
+  const page=new DOMParser().parseFromString(await (await fetch('/index.html')).text(),'text/html');
+  for(const link of page.querySelectorAll('link[rel="stylesheet"]'))document.head.append(document.importNode(link,true));
+  for(const script of page.querySelectorAll('script'))script.remove();
+  document.body.innerHTML=page.body.innerHTML;
+  const $=id=>document.getElementById(id);
+  $('auth').hidden=true;$('app').hidden=false;
+  document.querySelector('.main-wrap').classList.add('notes-page-active');
+  document.querySelectorAll('.view').forEach(el=>el.hidden=el.id!=='notesView');
+  document.querySelectorAll('dialog').forEach(el=>el.remove());
+  $('todayLabel').textContent='2026년 11월 5일 목요일';
+  $('serverSaveStatus').textContent='테스트 · 서버 연결 없음';
+  $('serverSavedAt').hidden=true;
+  $('themeButton').textContent='☾ 다크';
+  document.querySelectorAll('.header-nav').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.view==='notes')));
+  const now='2026-11-05T10:30:00Z';
+  const folders=[['general','일반 메모함'],['hidden','숨김 메모함'],['today','오늘 내일 할일']].map(([id,name],i)=>({id,name,user_id:'qa144',created_at:now,sort_order:i+1,legacy_key:id==='general'?'general':null}));
+  const notes=Array.from({length:8},(_,i)=>({id:'n'+i,user_id:'qa144',folder_id:i<6?'today':'general',body:['<오늘 할 일>\n1. 수업 자료 준비하기\n2. 일정 확인하기','<내일 할 일>\n메모를 자유롭게 작성하세요.','수업 아이디어\n끌기와 버튼 이동을 확인합니다.'][i%3],color:['pink','orange','sky','green','purple','yellow'][i%6],sort_order:i+1,created_at:now}));
+  const data={todo_note_folders:folders,todo_notes:notes};let serial=0;
+  const db={from(table){
+    let mode='read',values,filters={},ordering=[],range,single=false;
+    const q={select(){return q;},eq(k,v){filters[k]=v;return q;},order(k,v){ordering.push([k,v.ascending]);return q;},range(a,b){range=[a,b];return q;},update(v){mode='update';values=v;return q;},insert(v){mode='insert';values=v;return q;},delete(){mode='delete';return q;},single(){single=true;return q;},then(resolve){
+      let rows=data[table].filter(r=>Object.entries(filters).every(([k,v])=>r[k]===v));
+      const rank=v=>{const rs=data[table].filter(r=>r.user_id===v.user_id && (table!=='todo_notes' || r.folder_id===v.folder_id));return table==='todo_notes'?Math.min(1,...rs.map(r=>r.sort_order))-1:Math.max(0,...rs.map(r=>r.sort_order))+1;};
+      if(mode==='insert'){rows=[{id:'new'+(++serial),created_at:now,...values,sort_order:rank(values)}];data[table].push(...rows);}
+      if(mode==='update')rows.forEach(r=>{if(values.folder_id && values.folder_id!==r.folder_id)r.sort_order=rank({...r,...values});Object.assign(r,values);});
+      if(mode==='delete'){data[table]=data[table].filter(r=>!rows.includes(r));if(table==='todo_note_folders')data.todo_notes=data.todo_notes.filter(n=>!rows.some(f=>f.id===n.folder_id));}
+      for(const [k,asc] of ordering.toReversed())rows.sort((a,b)=>(typeof a[k]==='number'?a[k]-b[k]:String(a[k]).localeCompare(String(b[k])))*(asc?1:-1));
+      if(range)rows=rows.slice(range[0],range[1]+1);
+      resolve({data:structuredClone(single?rows[0]:rows)});
+    }};return q;
+  },async rpc(name,p){
+    const rs=data[p.p_folder_id===null?'todo_note_folders':'todo_notes'].filter(r=>p.p_folder_id===null || r.folder_id===p.p_folder_id);
+    p.p_ids.forEach((id,i)=>rs.find(r=>r.id===id).sort_order=i+1);return {data:{ids:p.p_ids}};
+  }};
+  localStorage.setItem('school-todo-note-folder-qa144','today');
+  installColorPickers();const notesApp=createNotes({db,getUser:()=>({id:'qa144'})});await notesApp.open();
+  $('themeButton').onclick=()=>{const dark=document.documentElement.dataset.theme!=='dark';document.documentElement.dataset.theme=dark?'dark':'light';$('themeButton').textContent=dark?'☀ 라이트':'☾ 다크';};
+}
+</script></body></html>
