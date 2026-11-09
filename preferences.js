@@ -1,8 +1,11 @@
-export const preferenceDefaults={theme:'system',search:'',statusFilter:'all',categoryFilter:'all',sort:'due',sourceFilter:'tasks'};
+const weekOrderOptions={weekStart:['sunday','monday'],timetableWeekStart:['sunday','monday','weekdays']};
+const legacyWeekKeys={weekStart:'school-todo-week-start',timetableWeekStart:'school-todo-timetable-week-start'};
+export const preferenceDefaults={theme:'system',search:'',statusFilter:'all',categoryFilter:'all',sort:'due',sourceFilter:'tasks',weekStart:'monday',timetableWeekStart:'monday'};
 export function normalizePreferences(raw={}){
  const value={...preferenceDefaults};
  for(const [key,allowed] of Object.entries({theme:['light','dark','system'],statusFilter:['all','active','done','today','week','month','threeDays','fiveDays','sevenDays','overdue'],sort:['due','priority','start','new','title','category']}))if(allowed.includes(raw[key]))value[key]=raw[key];
  for(const key of ['search','categoryFilter','sourceFilter'])if(typeof raw[key]==='string')value[key]=raw[key].slice(0,key==='search'?500:100);
+ for(const [key,allowed] of Object.entries(weekOrderOptions))if(allowed.includes(raw[key]))value[key]=raw[key];
  return value;
 }
 export function createPreferences({db,storage=localStorage,onApply,onStatus=()=>{}}){
@@ -11,6 +14,9 @@ export function createPreferences({db,storage=localStorage,onApply,onStatus=()=>
  const queued=id=>`${cache(id)}-pending`;
  const read=key=>{try{return JSON.parse(storage.getItem(key)||'null');}catch{return null;}};
  const write=(key,value)=>{try{storage.setItem(key,JSON.stringify(value));}catch{}};
+ const legacyOrders=()=>Object.fromEntries(Object.entries(legacyWeekKeys).flatMap(([key,storageKey])=>{
+  try{const value=storage.getItem(storageKey);return weekOrderOptions[key].includes(value)?[[key,value]]:[];}catch{return [];}
+ }));
  const checked=result=>{if(result.error)throw result.error;return result.data;};
  function reset(){generation++;readSequence++;clearTimeout(timer);owner=null;pending={};running=null;ready=false;}
  async function flush(){
@@ -37,27 +43,30 @@ export function createPreferences({db,storage=localStorage,onApply,onStatus=()=>
  }
  async function sync(){
   if(!owner||!ready)return;
+  await refresh();
+ }
+ async function refresh(){
   const id=owner,token=generation;
   try{
    await flush();
    const version=revision,readToken=++readSequence;
    const row=checked(await db.from('todo_preferences').select('settings').eq('user_id',id).maybeSingle());
    if(token!==generation||version!==revision||readToken!==readSequence||Object.keys(pending).length)return;
-   if(row){const value=normalizePreferences(row.settings);write(cache(id),value);await onApply(value);onStatus('');}
-  }catch(error){if(token===generation)onStatus('설정 동기화 실패: '+error.message);}
+   const settings=row?.settings||{},legacy=legacyOrders();
+   const migrate=Object.fromEntries(Object.entries(legacy).filter(([key])=>!(key in settings)));
+   const value=normalizePreferences({...legacy,...(row?settings:read(cache(id)))});
+   write(cache(id),value);await onApply(value);
+   if(token!==generation||version!==revision||readToken!==readSequence)return;
+   if(Object.keys(migrate).length){patch(migrate);await flush();}
+   else onStatus('');
+  }catch(error){if(token===generation)onStatus('설정 동기화 실패: '+error.message+' · ver1.44까지_통합.sql 실행 여부를 확인하세요.');}
  }
  async function open(id){
   reset();owner=id;const token=generation;pending=read(queued(id))||{};
-  const local=read(cache(id));await onApply(normalizePreferences({...local,...pending}));
+  const legacy=legacyOrders(),local=read(cache(id));await onApply(normalizePreferences({...legacy,...local,...pending}));
   if(token!==generation)return;
-  ready=true;
-  try{
-   await flush();
-   const version=revision,readToken=++readSequence;
-   const row=checked(await db.from('todo_preferences').select('settings').eq('user_id',id).maybeSingle());
-   if(token!==generation||version!==revision||readToken!==readSequence||Object.keys(pending).length)return;
-   const value=normalizePreferences(row?.settings||local||preferenceDefaults);write(cache(id),value);await onApply(value);onStatus('');
-  }catch(error){if(token===generation)onStatus('설정 동기화 실패: '+error.message+' · ver1.44까지_통합.sql 실행 여부를 확인하세요.');}
+  try{await refresh();}
+  finally{if(token===generation)ready=true;}
  }
  return {open,patch,flush,sync,reset};
 }

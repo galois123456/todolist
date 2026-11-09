@@ -40,8 +40,12 @@ const timetableList=createTimetableList({db,getUser:()=>state.user,getWeekStart:
 const timetable = createTimetable({ db, getUser: () => state.user, getWeekStart: () => timetableWeekStart, onChange:()=>{timetableList.refresh();} });
 
 
-const preferences=createPreferences({db,onStatus:message=>{$('preferencesStatus').textContent=message;},onApply:async value=>{
+const preferences=createPreferences({db,onStatus:message=>{
+  $('preferencesStatus').textContent=message;
+  $('settingsPreferencesStatus').textContent=message;
+},onApply:async value=>{
   applyTheme(value.theme);
+  applyWeekOrders(value.weekStart,value.timetableWeekStart);
   $('search').value=value.search;$('sort').value=value.sort;$('statusFilter').value=value.statusFilter;
   $('categoryFilter').value=state.categories.some(c=>c.id===value.categoryFilter)?value.categoryFilter:'all';
   await timetableList.setSource(value.sourceFilter);
@@ -75,18 +79,25 @@ applyTheme(localStorage.getItem('school-todo-theme') || 'system');
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => applyTheme(localStorage.getItem('school-todo-theme') || 'system'));
 $('themeButton').onclick = () => {const value=document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';applyTheme(value);preferences.patch({theme:value});};
 $('themeSelect').onchange = event => {applyTheme(event.target.value);preferences.patch({theme:event.target.value});};
+function applyWeekOrders(calendarOrder,timetableOrder) {
+  const timetableChanged=timetableWeekStart!==timetableOrder;
+  weekStart=calendarOrder; timetableWeekStart=timetableOrder;
+  $('weekStartSelect').value=weekStart;
+  $('timetableWeekSelect').value=timetableWeekStart;
+  if(timetableChanged && state.view==='timetable')void timetable.open();
+}
 $('weekStartSelect').value = weekStart;
+$('timetableWeekSelect').value = timetableWeekStart;
 $('weekStartSelect').onchange = event => {
-  weekStart = event.target.value === 'sunday' ? 'sunday' : 'monday';
-  localStorage.setItem('school-todo-week-start', weekStart);
+  const value=event.target.value==='sunday'?'sunday':'monday';
+  applyWeekOrders(value,timetableWeekStart);
+  preferences.patch({weekStart:value});
   renderCalendar(); renderTasks();
 };
-
-$('timetableWeekSelect').value = timetableWeekStart;
 $('timetableWeekSelect').onchange = event => {
-  timetableWeekStart = ['sunday','monday','weekdays'].includes(event.target.value) ? event.target.value : 'monday';
-  localStorage.setItem('school-todo-timetable-week-start', timetableWeekStart);
-  timetable.render();
+  const value=['sunday','monday','weekdays'].includes(event.target.value)?event.target.value:'monday';
+  applyWeekOrders(weekStart,value);
+  preferences.patch({timetableWeekStart:value});
 };
 
 function showAuth() { saveStatus.reset(); preferences.reset(); attachments.reset(); timetableList.reset(); notes.reset(); timetable.reset(); $('auth').hidden = false; $('app').hidden = true; $('authMessage').textContent = ''; }
@@ -132,7 +143,7 @@ $('signOut').onclick = async () => {
 async function enter(user) {
   if (state.user?.id === user.id && !$('app').hidden) return;
   state.user = user; showApp(); switchView('list');
-  const controls=['search','sort','statusFilter','categoryFilter','sourceFilter','themeButton','themeSelect'];
+  const controls=['search','sort','statusFilter','categoryFilter','sourceFilter','themeButton','themeSelect','weekStartSelect','timetableWeekSelect'];
   controls.forEach(id=>$(id).disabled=true);
   try{await loadData();await timetableList.refresh();if(state.user?.id===user.id)await preferences.open(user.id);}
   finally{controls.forEach(id=>$(id).disabled=false);renderTasks();}
